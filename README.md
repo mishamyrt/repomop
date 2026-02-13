@@ -29,13 +29,33 @@ Deletion is permanent (`os.RemoveAll`).
 
 ```bash
 make build
-./bin/repomop
+./repomop
 ```
 
 Example: run against another directory
 
 ```bash
-./bin/repomop --path ~/Code
+./repomop --path ~/Code
+```
+
+## Install via curl
+
+Install the latest release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh
+```
+
+Install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | INSTALL_DIR=/usr/local/bin sh
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | VERSION=v0.1.0 sh
 ```
 
 ## CLI Flags
@@ -54,12 +74,32 @@ Example: run against another directory
 - `n` or `Esc`: cancel confirmation and return to the list
 - `q` or `Ctrl+C`: quit
 
+## Release Artifacts
+
+Each release tagged as `v*` publishes:
+
+- `repomop_darwin_arm64.tar.gz`
+- `repomop_linux_amd64.tar.gz`
+- `repomop_linux_arm64.tar.gz`
+- `checksums.txt` (SHA-256 for all archives)
+
+The install script verifies archive checksums before installation.
+
+## How to Publish a Release
+
+Create and push a tag:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+GitHub Actions will build artifacts and publish the GitHub Release automatically.
+
 ## Development Commands
 
 ```bash
-make build   # build binary to ./bin/repomop
+make build   # build binary
 make test    # run unit/integration tests
 make lint    # run revive (uses revive.toml)
 ```
-
-If `revive` is not installed locally, `make lint` uses `go run github.com/mgechev/revive@latest`.
