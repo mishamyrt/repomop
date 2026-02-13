@@ -25,25 +25,33 @@ Deletion is permanent (`os.RemoveAll`).
 - Ruby: `.bundle`, `vendor/bundle`
 - PHP: `vendor`
 
-## Build and Run
+## Install via curl
+
+Install the latest release:
 
 ```bash
-make build
-./bin/repomop
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh
 ```
 
-Example: run against another directory
+Install to a custom directory:
 
 ```bash
-./bin/repomop --path ~/Code
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | INSTALL_DIR=/usr/local/bin sh
 ```
 
-## CLI Flags
+Install a specific version:
 
-- `--path <dir>`: scan root
-- `--max-depth <n>`: maximum depth (`-1` = unlimited)
-- `--dry-run`: show only, do not delete
-- `--yes`: delete all found artifacts without interactive confirmation
+```bash
+curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | VERSION=v0.1.0 sh
+```
+
+## Usage
+
+Go to your projects directory and run:
+
+```bash
+repomop
+```
 
 ## TUI Controls
 
@@ -53,13 +61,3 @@ Example: run against another directory
 - `y`: confirm deletion
 - `n` or `Esc`: cancel confirmation and return to the list
 - `q` or `Ctrl+C`: quit
-
-## Development Commands
-
-```bash
-make build   # build binary to ./bin/repomop
-make test    # run unit/integration tests
-make lint    # run revive (uses revive.toml)
-```
-
-If `revive` is not installed locally, `make lint` uses `go run github.com/mgechev/revive@latest`.
