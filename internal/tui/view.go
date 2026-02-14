@@ -200,7 +200,7 @@ func (m Model) visibleRange() (int, int) {
 	if len(m.artifacts) == 0 {
 		return 0, 0
 	}
-	listHeight := m.height - 8
+	listHeight := m.height - 6
 	if listHeight < 5 {
 		listHeight = 5
 	}
