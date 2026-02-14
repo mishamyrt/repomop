@@ -112,7 +112,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.state {
 		case stateLoading:
-			if keyMatches(typed, "q", "ctrl+c") {
+			if keyMatches(typed, "q", "esc", "ctrl+c") {
 				return m, tea.Quit
 			}
 		case stateList:
@@ -132,12 +132,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case keyMatches(typed, "enter"):
 				if m.selectedCount() == 0 {
-					m.message = "Select at least one artifact with Space."
 					break
 				}
 				m.state = stateConfirm
 				m.message = ""
-			case keyMatches(typed, "q", "ctrl+c"):
+			case keyMatches(typed, "q", "esc", "ctrl+c"):
 				return m, tea.Quit
 			}
 		case stateConfirm:
@@ -152,17 +151,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.message = ""
 				cmds = append(cmds, m.spinner.Tick)
 				cmds = append(cmds, deleteArtifactsCmd(selected))
-			case keyMatches(typed, "n", "esc"):
+			case keyMatches(typed, "n"):
 				m.state = stateList
-			case keyMatches(typed, "q", "ctrl+c"):
+			case keyMatches(typed, "q", "esc", "ctrl+c"):
 				return m, tea.Quit
 			}
 		case stateDeleting:
-			if keyMatches(typed, "q", "ctrl+c") {
+			if keyMatches(typed, "q", "esc", "ctrl+c") {
 				return m, nil
 			}
 		case stateDone, stateError:
-			if keyMatches(typed, "enter", "q", "ctrl+c") {
+			if keyMatches(typed, "enter", "q", "esc", "ctrl+c") {
 				return m, tea.Quit
 			}
 		}

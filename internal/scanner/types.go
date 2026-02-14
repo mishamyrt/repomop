@@ -6,7 +6,7 @@ type ArtifactKind string
 // Artifact kind values used by the scanner and UI.
 const (
 	ArtifactPythonVenv ArtifactKind = "python-venv"
-	ArtifactNodeModule ArtifactKind = "node_modules"
+	ArtifactNodeModule ArtifactKind = "node-modules"
 	ArtifactRustTarget ArtifactKind = "rust-target"
 	ArtifactSwiftBuild ArtifactKind = "swift-build"
 	ArtifactJavaGradle ArtifactKind = "java-gradle"

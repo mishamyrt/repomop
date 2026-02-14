@@ -148,11 +148,10 @@ func printDryRun(stdout io.Writer, root string, artifacts []scanner.Artifact, wa
 	total := int64(0)
 	for _, artifact := range artifacts {
 		total += artifact.SizeBytes
-		fmt.Fprintf(stdout, "- %-11s %8s  %s  (project: %s)\n",
-			artifact.Kind,
+		fmt.Fprintf(stdout, "- %8s  %s  %s\n",
 			format.Bytes(artifact.SizeBytes),
 			relativePathOrSelf(root, artifact.Path),
-			relativePathOrSelf(root, artifact.ProjectRoot),
+			artifact.Kind,
 		)
 	}
 	fmt.Fprintf(stdout, "Found: %d artifacts, Potential free space: %s\n", len(artifacts), format.Bytes(total))

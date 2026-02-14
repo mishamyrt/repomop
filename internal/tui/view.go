@@ -11,11 +11,22 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-	warnStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	errStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	okStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	dimStyle   = lipgloss.NewStyle().Faint(true)
+	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	subtitleStyle       = lipgloss.NewStyle().Faint(true)
+	warnStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	errStyle            = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	okStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	dimStyle            = lipgloss.NewStyle().Faint(true)
+	helpStyle           = lipgloss.NewStyle().Faint(true)
+	selectedMarkerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+	idleMarkerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	focusBarStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+	idleBarStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
+	sizeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	pathStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	kindStyle           = lipgloss.NewStyle().Faint(true)
+	focusedRowStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+	summaryStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
 )
 
 // View renders the current TUI screen.
@@ -50,35 +61,6 @@ func (m Model) renderLoadingView() string {
 
 func (m Model) renderListView() string {
 	lines := make([]string, 0, len(m.artifacts)+8)
-	lines = append(lines, titleStyle.Render("repomop: select artifacts"))
-	lines = append(lines, fmt.Sprintf("Found %d artifacts.", len(m.artifacts)))
-	lines = append(lines, dimStyle.Render("Keys: ↑/↓ move, Space select, Enter confirm, q quit"))
-	lines = append(lines, "")
-
-	start, end := m.visibleRange()
-	for idx := start; idx < end; idx++ {
-		artifact := m.artifacts[idx]
-		cursor := " "
-		if idx == m.cursor {
-			cursor = ">"
-		}
-		checkbox := "[ ]"
-		if m.selected[idx] {
-			checkbox = "[x]"
-		}
-		relPath := relativePathOrSelf(m.opts.RootPath, artifact.Path)
-		relProject := relativePathOrSelf(m.opts.RootPath, artifact.ProjectRoot)
-
-		line := fmt.Sprintf("%s %s %-11s %8s  %s  (project: %s)",
-			cursor,
-			checkbox,
-			artifact.Kind,
-			format.Bytes(artifact.SizeBytes),
-			relPath,
-			relProject,
-		)
-		lines = append(lines, line)
-	}
 
 	selectedCount := m.selectedCount()
 	selectedSize := int64(0)
@@ -87,13 +69,72 @@ func (m Model) renderListView() string {
 			selectedSize += m.artifacts[idx].SizeBytes
 		}
 	}
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("Selected: %d, Potential free space: %s", selectedCount, format.Bytes(selectedSize)))
-	if m.message != "" {
-		lines = append(lines, warnStyle.Render(m.message))
+
+	helpText := "↑↓ | Space select | q quit"
+	if selectedCount > 0 {
+		helpText = "↑↓ | Space select | Enter confirm | q quit"
 	}
 
+	lines = append(lines, subtitleStyle.Render(fmt.Sprintf("Found %d artifacts", len(m.artifacts))))
+	lines = append(lines, summaryStyle.Render(fmt.Sprintf("Selected %d · Reclaimable %s", selectedCount, format.Bytes(selectedSize))))
+	lines = append(lines, "")
+
+	sizeWidth := m.sizeColumnWidth()
+	start, end := m.visibleRange()
+	for idx := start; idx < end; idx++ {
+		lines = append(lines, m.renderArtifactLine(idx, sizeWidth))
+	}
+
+	if m.message != "" {
+		lines = append(lines, "")
+		lines = append(lines, warnStyle.Render(m.message))
+	}
+	lines = append(lines, "")
+	lines = append(lines, helpStyle.Render(helpText))
+
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderArtifactLine(idx int, sizeWidth int) string {
+	artifact := m.artifacts[idx]
+	focused := idx == m.cursor
+
+	marker := "○"
+	markerRenderer := idleMarkerStyle
+	if m.selected[idx] {
+		marker = "●"
+		markerRenderer = selectedMarkerStyle
+	}
+
+	path := relativePathOrSelf(m.opts.RootPath, artifact.Path)
+	pathWidth := m.pathColumnWidth(sizeWidth, string(artifact.Kind), focused)
+	pathTextRaw := truncatePathLeft(path, pathWidth)
+
+	barTextRaw := "  "
+	barRenderer := idleBarStyle
+	sizeRenderer := sizeStyle
+	pathRenderer := pathStyle
+	kindRenderer := kindStyle
+	separator := "  "
+
+	if focused {
+		barTextRaw = "▶ "
+		barRenderer = focusBarStyle
+		barRenderer = barRenderer.Background(focusedRowStyle.GetBackground())
+		markerRenderer = markerRenderer.Background(focusedRowStyle.GetBackground()).Bold(true)
+		sizeRenderer = sizeRenderer.Background(focusedRowStyle.GetBackground()).Bold(true)
+		pathRenderer = pathRenderer.Background(focusedRowStyle.GetBackground()).Bold(true)
+		kindRenderer = kindRenderer.Background(focusedRowStyle.GetBackground()).Bold(true)
+		separator = focusedRowStyle.Render("  ")
+	}
+
+	barText := barRenderer.Render(barTextRaw)
+	sizeText := sizeRenderer.Width(sizeWidth).Align(lipgloss.Right).Render(format.Bytes(artifact.SizeBytes))
+	pathText := pathRenderer.Render(pathTextRaw)
+	kindText := kindRenderer.Render(string(artifact.Kind))
+	markerText := markerRenderer.Render(marker)
+
+	return barText + markerText + separator + sizeText + separator + pathText + separator + kindText
 }
 
 func (m Model) renderConfirmView() string {
@@ -221,6 +262,139 @@ func (m Model) visibleRange() (int, int) {
 		}
 	}
 	return start, end
+}
+
+func (m Model) sizeColumnWidth() int {
+	width := lipgloss.Width(format.Bytes(0))
+	for _, artifact := range m.artifacts {
+		current := lipgloss.Width(format.Bytes(artifact.SizeBytes))
+		if current > width {
+			width = current
+		}
+	}
+	return width
+}
+
+func (m Model) pathColumnWidth(sizeWidth int, kind string, focused bool) int {
+	totalWidth := m.width
+	if totalWidth <= 0 {
+		totalWidth = 80
+	}
+
+	const (
+		barWidth       = 2
+		markerWidth    = 1
+		separatorWidth = 6
+	)
+	kindWidth := lipgloss.Width(kind) + kindStyle.GetHorizontalFrameSize()
+	pathWidth := totalWidth - barWidth - markerWidth - separatorWidth - sizeWidth - kindWidth
+	if focused {
+		pathWidth -= focusedRowStyle.GetHorizontalFrameSize()
+	}
+	if pathWidth < 1 {
+		return 1
+	}
+	return pathWidth
+}
+
+func truncatePathLeft(path string, maxWidth int) string {
+	const ellipsis = "…"
+	if maxWidth <= 0 {
+		return ""
+	}
+	if lipgloss.Width(path) <= maxWidth {
+		return path
+	}
+	if maxWidth == 1 {
+		return ellipsis
+	}
+
+	separator := string(filepath.Separator)
+	hasSeparator := strings.Contains(path, separator)
+
+	prefix := ellipsis
+	if hasSeparator {
+		prefix = ellipsis + separator
+	}
+	prefixWidth := lipgloss.Width(prefix)
+	if maxWidth <= prefixWidth {
+		return ellipsis
+	}
+	remainingWidth := maxWidth - prefixWidth
+	if remainingWidth <= 0 {
+		return ellipsis
+	}
+
+	if !hasSeparator {
+		tail := tailByWidth(path, remainingWidth)
+		if tail == "" {
+			return ellipsis
+		}
+		return prefix + tail
+	}
+
+	parts := strings.Split(path, separator)
+	suffixParts := make([]string, 0, len(parts))
+	width := 0
+	for idx := len(parts) - 1; idx >= 0; idx-- {
+		part := parts[idx]
+		if part == "" {
+			continue
+		}
+
+		partWidth := lipgloss.Width(part)
+		if len(suffixParts) > 0 {
+			partWidth += lipgloss.Width(separator)
+		}
+		if width+partWidth > remainingWidth {
+			if len(suffixParts) == 0 {
+				tail := tailByWidth(part, remainingWidth)
+				if tail == "" {
+					return ellipsis
+				}
+				return prefix + tail
+			}
+			break
+		}
+
+		suffixParts = append(suffixParts, part)
+		width += partWidth
+	}
+
+	if len(suffixParts) == 0 {
+		return ellipsis
+	}
+
+	for left, right := 0, len(suffixParts)-1; left < right; left, right = left+1, right-1 {
+		suffixParts[left], suffixParts[right] = suffixParts[right], suffixParts[left]
+	}
+	return prefix + strings.Join(suffixParts, separator)
+}
+
+func tailByWidth(value string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) <= maxWidth {
+		return value
+	}
+
+	runes := []rune(value)
+	tail := make([]rune, 0, len(runes))
+	width := 0
+	for idx := len(runes) - 1; idx >= 0; idx-- {
+		runeWidth := lipgloss.Width(string(runes[idx]))
+		if width+runeWidth > maxWidth {
+			break
+		}
+		tail = append(tail, runes[idx])
+		width += runeWidth
+	}
+
+	for left, right := 0, len(tail)-1; left < right; left, right = left+1, right-1 {
+		tail[left], tail[right] = tail[right], tail[left]
+	}
+	return string(tail)
 }
 
 func relativePathOrSelf(root string, path string) string {

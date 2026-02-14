@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"repomop/internal/scanner"
 )
 
 func TestRunDryRunDoesNotDelete(t *testing.T) {
@@ -69,6 +72,31 @@ func TestRunRejectsInvalidFlags(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "cannot be used together") {
 		t.Fatalf("unexpected stderr: %s", stderr.String())
+	}
+}
+
+func TestPrintDryRunUsesSizePathTypeFormat(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator), "repo")
+	artifacts := []scanner.Artifact{
+		{
+			Kind:        scanner.ArtifactNodeModule,
+			Path:        filepath.Join(root, "workspace", "node_modules"),
+			ProjectRoot: filepath.Join(root, "workspace"),
+			SizeBytes:   2048,
+		},
+	}
+
+	stdout := &bytes.Buffer{}
+	printDryRun(stdout, root, artifacts, nil)
+
+	output := stdout.String()
+	if strings.Contains(output, "(project:") {
+		t.Fatalf("project column must not be present in dry-run output:\n%s", output)
+	}
+
+	pattern := regexp.MustCompile(`(?m)^-\s+2\.0 KiB\s+workspace/node_modules\s+node_modules$`)
+	if !pattern.MatchString(output) {
+		t.Fatalf("artifact line must be in 'size path type' order:\n%s", output)
 	}
 }
 
