@@ -16,3 +16,13 @@ test:
 .PHONY: lint
 lint:
 	revive -config revive.toml -formatter stylish ./...
+
+.PHONY: install
+install: build
+	rm -f "$(HOME)/.local/bin/repomop"
+	cp repomop "$(HOME)/.local/bin/repomop"
+	chmod +x "$(HOME)/.local/bin/repomop"
+
+.PHONY: clean
+clean:
+	rm -f repomop
