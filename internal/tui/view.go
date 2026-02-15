@@ -23,10 +23,13 @@ var (
 	focusBarStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	idleBarStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 	sizeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	pathStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	kindStyle           = lipgloss.NewStyle().Faint(true)
-	focusedRowStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
-	summaryStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
+	pathStyle           = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+		Light: "0",
+		Dark:  "7",
+	})
+	kindStyle       = lipgloss.NewStyle().Faint(true)
+	focusedRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+	summaryStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
 )
 
 // View renders the current TUI screen.
