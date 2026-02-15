@@ -26,7 +26,7 @@ Developers accumulate projects over time. Each one carries build artifacts and d
 
 | Ecosystem | Detected artifacts |
 |---|---|
-| JavaScript / Node.js | `node_modules` |
+| JavaScript / Node.js | `node_modules` (with pnpm hard links handling) |
 | Rust | `target` |
 | Swift (SPM) | `.build` |
 | Python | virtualenvs (any directory name) |

@@ -94,7 +94,7 @@ func directorySize(path string) (int64, error) {
 		if err != nil {
 			return err
 		}
-		total += info.Size()
+		total += reclaimableFileSize(info)
 		return nil
 	})
 
