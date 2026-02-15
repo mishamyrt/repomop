@@ -22,6 +22,10 @@ Developers accumulate projects over time. Each one carries build artifacts and d
 3. Presents an interactive list where you pick what to remove.
 4. Asks for confirmation, then deletes the selected directories.
 
+<p align="center">
+  <img src="./docs/demo.gif" alt="repomop demo" width="500px" />
+</p>
+
 ## Supported Ecosystems
 
 | Ecosystem | Detected artifacts |
