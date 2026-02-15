@@ -46,21 +46,21 @@ func TestRenderListViewUsesFzfLikeMarkersAndFormat(t *testing.T) {
 	if strings.Contains(output, "\n>") {
 		t.Fatalf("legacy cursor marker must not be present:\n%s", output)
 	}
-	if !strings.Contains(output, "■") {
-		t.Fatalf("selected marker must use ■:\n%s", output)
+	if !strings.Contains(output, "●") {
+		t.Fatalf("selected marker must use ●:\n%s", output)
 	}
-	if !strings.Contains(output, "□") {
-		t.Fatalf("unselected marker must use □:\n%s", output)
+	if !strings.Contains(output, "○") {
+		t.Fatalf("unselected marker must use ○:\n%s", output)
 	}
-	if !strings.Contains(output, "▌") {
-		t.Fatalf("focused row must include a left block marker:\n%s", output)
+	if !strings.Contains(output, "▶") {
+		t.Fatalf("focused row must include a cursor marker ▶:\n%s", output)
 	}
 
 	artifactLine := firstLineContaining(output, "2.0 KiB", "workspace/node_modules", "node_modules")
 	if artifactLine == "" {
 		t.Fatalf("artifact line with expected fields not found:\n%s", output)
 	}
-	expectedOrder := regexp.MustCompile(`■\s+2\.0 KiB\s+workspace/node_modules\s+node_modules`)
+	expectedOrder := regexp.MustCompile(`●\s+2\.0 KiB\s+workspace/node_modules\s+node-modules`)
 	if !expectedOrder.MatchString(artifactLine) {
 		t.Fatalf("artifact line must be in 'marker size path type' order, got: %q", artifactLine)
 	}
@@ -142,7 +142,7 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 		t.Fatalf("second line must contain selection summary, got: %q", lines[1])
 	}
 	lastLine := lines[len(lines)-1]
-	if !strings.Contains(lastLine, "Keys: ↑↓ move, Space select, q quit") {
+	if !strings.Contains(lastLine, "↑↓ | Space select | q quit") {
 		t.Fatalf("last line must contain help text at bottom, got: %q", lastLine)
 	}
 	if !strings.Contains(outputNoSelection, "▶ ○") {
@@ -166,7 +166,7 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 	withSelection := base
 	withSelection.selected = map[int]bool{0: true}
 	outputWithSelection := stripANSI(withSelection.renderListView())
-	if !strings.Contains(outputWithSelection, "Keys: ↑↓ move, Space select, Enter confirm, q quit") {
+	if !strings.Contains(outputWithSelection, "↑↓ | Space select | Enter confirm | q quit") {
 		t.Fatalf("help must include Enter confirm when selection exists:\n%s", outputWithSelection)
 	}
 }

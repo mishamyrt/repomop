@@ -94,7 +94,7 @@ func TestPrintDryRunUsesSizePathTypeFormat(t *testing.T) {
 		t.Fatalf("project column must not be present in dry-run output:\n%s", output)
 	}
 
-	pattern := regexp.MustCompile(`(?m)^-\s+2\.0 KiB\s+workspace/node_modules\s+node_modules$`)
+	pattern := regexp.MustCompile(`(?m)^-\s+2\.0 KiB\s+workspace/node_modules\s+node-modules$`)
 	if !pattern.MatchString(output) {
 		t.Fatalf("artifact line must be in 'size path type' order:\n%s", output)
 	}
