@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>repomop — Clean up build artifacts across all your projects</title>
+  <meta name="description" content="repomop scans your projects folder, finds build artifacts and dependency caches, and lets you clean them up in one shot through a friendly interactive interface." />
+  <link rel="icon" href="logo.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --surface-base: #FFFFFF;
+      --surface-raised: #F5F7FA;
+      --text-primary: #2D2B30;
+      --text-body: #454547;
+      --text-secondary: #6D89B5;
+      --text-tertiary: #808080;
+      --border-default: #B5C7D8;
+      --accent: #155BD0;
+      --accent-hover: #0858DC;
+      --code-bg: #F0F4F8;
+      --code-border: #D6DEE8;
+    }
+
+    html {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--surface-base);
+      color: var(--text-body);
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      min-height: 100dvh;
+    }
+
+    /* ---- NAV ---- */
+
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .nav-brand svg {
+      width: 20px;
+      height: auto;
+    }
+
+    .nav-brand span {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-tertiary);
+      text-decoration: none;
+      transition: color 0.15s ease-out;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-github {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-github a {
+      display: flex;
+      align-items: center;
+      color: var(--text-tertiary);
+      transition: color 0.15s ease-out;
+    }
+
+    .nav-github a:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-github svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* ---- HERO ---- */
+
+    .hero {
+      padding: 160px 32px 80px;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .hero-logo {
+      width: 56px;
+      height: auto;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: 51px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-wrap: balance;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .hero p {
+      font-size: 27px;
+      font-weight: 500;
+      color: var(--text-body);
+      text-wrap: pretty;
+      line-height: 1.4;
+      max-width: 640px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      border-radius: 21px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease-out;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-primary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 500;
+      font-family: inherit;
+      border: 1px solid var(--border-default);
+      border-radius: 21px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease-out, border-color 0.15s ease-out;
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-raised);
+      border-color: var(--accent);
+    }
+
+    .btn-secondary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ---- INSTALL SNIPPET ---- */
+
+    .install-section {
+      max-width: 640px;
+      margin: 0 auto 80px;
+      padding: 0 32px;
+    }
+
+    .install-box {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .install-box code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 14px;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .install-box button {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-tertiary);
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s ease-out;
+    }
+
+    .install-box button:hover {
+      color: var(--accent);
+    }
+
+    .install-box button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .install-box button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .install-box .copied-label {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--accent);
+      display: none;
+    }
+
+    .install-box.copied .copied-label {
+      display: inline;
+    }
+
+    .install-box.copied button svg {
+      display: none;
+    }
+
+    /* ---- DEMO ---- */
+
+    .demo {
+      max-width: 640px;
+      margin: 0 auto 100px;
+      padding: 0 32px;
+      text-align: center;
+    }
+
+    .demo img {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--code-border);
+    }
+
+    /* ---- SECTION ---- */
+
+    section {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 32px 100px;
+    }
+
+    section h2 {
+      font-size: 43px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-wrap: balance;
+      line-height: 1.15;
+      margin-bottom: 40px;
+    }
+
+    section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    /* ---- HOW IT WORKS ---- */
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .step {
+      background: var(--surface-raised);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .step h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .step p {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-tertiary);
+      text-wrap: pretty;
+      line-height: 1.5;
+    }
+
+    /* ---- ECOSYSTEMS ---- */
+
+    .eco-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .eco-card {
+      background: var(--surface-raised);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .eco-card h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .eco-card p {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-tertiary);
+      line-height: 1.5;
+    }
+
+    .eco-card code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    .eco-note {
+      margin-top: 20px;
+      font-size: 14px;
+      color: var(--text-tertiary);
+      line-height: 1.6;
+      text-wrap: pretty;
+    }
+
+    /* ---- USAGE ---- */
+
+    .usage-block {
+      margin-bottom: 32px;
+    }
+
+    .usage-block:last-child {
+      margin-bottom: 0;
+    }
+
+    .usage-block p {
+      font-size: 15px;
+      color: var(--text-tertiary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+      text-wrap: pretty;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      overflow-x: auto;
+    }
+
+    pre code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    /* ---- OPTIONS TABLE ---- */
+
+    .options-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    .options-table th,
+    .options-table td {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .options-table thead th {
+      font-weight: 500;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .options-table tbody td {
+      border-bottom: 1px solid var(--code-border);
+      color: var(--text-body);
+    }
+
+    .options-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .options-table code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- CONTROLS ---- */
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .control-card {
+      background: var(--surface-raised);
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: center;
+    }
+
+    .control-card .key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .control-card kbd {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--surface-base);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+      padding: 4px 8px;
+      box-shadow: 0 1px 0 var(--border-default);
+    }
+
+    .control-card .sep {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .control-card p {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    /* ---- WARNING ---- */
+
+    .warning {
+      margin-top: 32px;
+      background: #FFF8F0;
+      border: 1px solid #F0D8B5;
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 14px;
+      color: #8B6914;
+      line-height: 1.5;
+    }
+
+    .warning strong {
+      font-weight: 700;
+    }
+
+    /* ---- FOOTER ---- */
+
+    footer {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 32px;
+      border-top: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer p {
+      font-size: 12px;
+      font-weight: 300;
+      color: var(--text-tertiary);
+    }
+
+    footer a {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.15s ease-out;
+    }
+
+    footer a:hover {
+      color: var(--accent);
+    }
+
+    /* ---- RESPONSIVE ---- */
+
+    @media (max-width: 720px) {
+      .hero h1 {
+        font-size: 36px;
+      }
+
+      .hero p {
+        font-size: 20px;
+      }
+
+      section h2 {
+        font-size: 28px;
+        margin-bottom: 24px;
+      }
+
+      .steps {
+        grid-template-columns: 1fr;
+      }
+
+      .eco-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .controls-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hero {
+        padding: 120px 20px 60px;
+      }
+
+      section {
+        padding: 0 20px 80px;
+      }
+
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .install-box code {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#" class="nav-brand">
+      <svg fill="none" viewBox="0 0 432 936" xmlns="http://www.w3.org/2000/svg">
+        <path d="m333 788c.5 25.333 10.6 88.8 47 140l-11 7.5h-42.5c-10.333-10.833-33.5-43.8-43.5-89-.001.022-1.997 59.505 12 89h-147.5c-1.167-17.333-3.8-51.7-5-50.5-1.5 1.502-14 47.5-17 50.5h-40.5c6.1667-15.833 17.3-55.8 12.5-89-10.0002 33-18.5002 67-43.5 89h-42.5l-11.5-7.5c17.5001-25.167 51.4002-88.4 47-140zm-143-788c21.539 0 39 17.4609 39 39 0 13.8071-7.175 25.9377-18 32.8682v95.2628c5.093 3.26 9.375 7.673 12.485 12.869h41.03c6.811-11.38 19.257-19 33.485-19 17.775 0 32.771 11.892 37.47 28.153 11.099 4.704 21.177 11.181 29.853 19.337 11.912 11.198 20.721 25.138 25.882 41.028 13.45 6.152 22.795 19.725 22.795 35.482 0 21.539-17.461 39-39 39s-39-17.461-39-39c0-12.191 5.594-23.074 14.354-30.226-3.147-6.671-7.382-12.397-12.427-17.139-3.792-3.565-8.183-6.703-13.126-9.307-6.988 6.614-16.42 10.672-26.801 10.672-14.228 0-26.674-7.62-33.485-19h-41.03c-3.11 5.196-7.392 9.608-12.485 12.868v98.263c10.825 6.93 18 19.062 18 32.869s-7.175 25.938-18 32.868v127.154c17.775-18.597 42.613-32.522 76-32.522 20.883 0 37.511-6.806 48.742-17.363 11.107-10.441 18.258-25.763 18.258-45.637v-2.75h-35.292l56.292-84.75 56.292 84.75h-35.292v2.75c0 30.626-11.349 57.305-31.492 76.239-20.019 18.818-47.391 28.761-77.508 28.761-27.529 0-45.728 15.194-58.086 36.208-12.779 21.731-17.414 47.009-17.414 58.792h-.5v44.591c11.213 1.01 20 10.433 20 21.909v28h80c12.15 0 22 9.85 22 22v27h-286v-27c0-12.15 9.8497-22 22-22h81v-28c0-11.133 8.269-20.333 19-21.796v-276.336c-10.825-6.93-18-19.061-18-32.868s7.175-25.939 18-32.869v-98.263c-10.825-6.93-18-19.061-18-32.868s7.175-25.939 18-32.869v-95.2628c-10.825-6.9305-18-19.0611-18-32.8682 0-21.5391 17.461-39 39-39z" fill="#2D2B30"/>
+      </svg>
+      <span>repomop</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#ecosystems">Ecosystems</a></li>
+      <li><a href="#installation">Installation</a></li>
+      <li><a href="#usage">Usage</a></li>
+    </ul>
+    <div class="nav-github">
+      <a href="https://github.com/mishamyrt/repomop" target="_blank" rel="noopener noreferrer" aria-label="View on GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <img src="logo.svg" alt="repomop logo" class="hero-logo" />
+    <h1>Clean up build artifacts across all your projects</h1>
+    <p>Scan your projects folder, find build artifacts and dependency caches, and reclaim gigabytes of disk space in one shot.</p>
+    <div class="hero-actions">
+      <a href="#installation" class="btn-primary">Get Started</a>
+      <a href="https://github.com/mishamyrt/repomop" target="_blank" rel="noopener noreferrer" class="btn-secondary">View on GitHub</a>
+    </div>
+  </div>
+
+  <!-- INSTALL SNIPPET -->
+  <div class="install-section">
+    <div class="install-box" id="installBox">
+      <code>curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh</code>
+      <button onclick="copyInstall()" aria-label="Copy install command">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        <span class="copied-label">Copied</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- DEMO -->
+  <div class="demo">
+    <img src="demo.gif" alt="repomop terminal demo showing artifact scanning and cleanup" />
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <h3>Scan</h3>
+        <p>Recursively scans a directory for known build and dependency artifacts.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <h3>Measure</h3>
+        <p>Calculates the real disk size of each discovered artifact directory.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <h3>Choose</h3>
+        <p>Presents an interactive list where you pick exactly what to remove.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">4</div>
+        <h3>Clean</h3>
+        <p>Asks for confirmation, then permanently deletes the selected directories.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ECOSYSTEMS -->
+  <section id="ecosystems">
+    <h2>Supported ecosystems</h2>
+    <div class="eco-grid">
+      <div class="eco-card">
+        <h3>JavaScript / Node.js</h3>
+        <p><code>node_modules</code> with pnpm hard links handling</p>
+      </div>
+      <div class="eco-card">
+        <h3>Rust</h3>
+        <p><code>target</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>Swift (SPM)</h3>
+        <p><code>.build</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>Python</h3>
+        <p>Virtualenvs (any directory name)</p>
+      </div>
+      <div class="eco-card">
+        <h3>Java / Kotlin (Gradle)</h3>
+        <p><code>.gradle</code>, <code>build</code>, <code>out</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>Java (Maven)</h3>
+        <p><code>target</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>C / C++ (CMake)</h3>
+        <p><code>build</code>, <code>cmake-build-*</code>, <code>CMakeFiles</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>Dart / Flutter</h3>
+        <p><code>.dart_tool</code>, <code>build</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>Ruby</h3>
+        <p><code>.bundle</code>, <code>vendor/bundle</code></p>
+      </div>
+      <div class="eco-card">
+        <h3>PHP</h3>
+        <p><code>vendor</code></p>
+      </div>
+    </div>
+    <p class="eco-note">Each rule is tied to a project marker file (e.g. <code>Cargo.toml</code> for Rust, <code>package.json</code> for Node.js), so random directories with the same name won't be misidentified.</p>
+  </section>
+
+  <!-- INSTALLATION -->
+  <section id="installation">
+    <h2>Installation</h2>
+
+    <div class="usage-block">
+      <p>Install the latest version with a single command:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh</code></pre>
+    </div>
+
+    <div class="usage-block">
+      <p>By default the binary is placed in <code>$HOME/.local/bin</code>. To change the destination:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | INSTALL_DIR=/usr/local/bin sh</code></pre>
+    </div>
+
+    <div class="usage-block">
+      <p>To install a specific version:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | VERSION=v0.1.0 sh</code></pre>
+    </div>
+  </section>
+
+  <!-- USAGE -->
+  <section id="usage">
+    <h2>Usage</h2>
+
+    <div class="usage-block">
+      <p>Navigate to the directory that contains your projects and run:</p>
+      <pre><code>repomop</code></pre>
+    </div>
+
+    <div class="usage-block">
+      <p>You can also point it at a specific path:</p>
+      <pre><code>repomop --path ~/Projects</code></pre>
+    </div>
+
+    <h3>Options</h3>
+    <table class="options-table">
+      <thead>
+        <tr>
+          <th>Flag</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>--path</code></td>
+          <td>Root directory to scan (defaults to the current directory)</td>
+        </tr>
+        <tr>
+          <td><code>--max-depth</code></td>
+          <td>Maximum traversal depth (<code>-1</code> for unlimited)</td>
+        </tr>
+        <tr>
+          <td><code>--dry-run</code></td>
+          <td>List found artifacts without deleting anything</td>
+        </tr>
+        <tr>
+          <td><code>--yes</code></td>
+          <td>Skip confirmation and delete all found artifacts</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top: 40px;">Controls</h3>
+    <div class="controls-grid">
+      <div class="control-card">
+        <div class="key">
+          <kbd>&uarr;</kbd><kbd>&darr;</kbd>
+          <span class="sep">or</span>
+          <kbd>k</kbd><kbd>j</kbd>
+        </div>
+        <p>Navigate the list</p>
+      </div>
+      <div class="control-card">
+        <div class="key"><kbd>Space</kbd></div>
+        <p>Select / deselect item</p>
+      </div>
+      <div class="control-card">
+        <div class="key"><kbd>Enter</kbd></div>
+        <p>Proceed to confirmation</p>
+      </div>
+      <div class="control-card">
+        <div class="key"><kbd>y</kbd></div>
+        <p>Confirm deletion</p>
+      </div>
+      <div class="control-card">
+        <div class="key">
+          <kbd>n</kbd>
+          <span class="sep">or</span>
+          <kbd>Esc</kbd>
+        </div>
+        <p>Cancel and return</p>
+      </div>
+      <div class="control-card">
+        <div class="key">
+          <kbd>q</kbd>
+          <span class="sep">or</span>
+          <kbd>Ctrl+C</kbd>
+        </div>
+        <p>Quit</p>
+      </div>
+    </div>
+
+    <div class="warning">
+      <strong>Warning:</strong> Deletion is permanent. Selected directories are removed with <code>os.RemoveAll</code>.
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>repomop &mdash; reclaim your disk space</p>
+    <a href="https://github.com/mishamyrt/repomop" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </footer>
+
+  <script>
+    function copyInstall() {
+      const cmd = 'curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh';
+      navigator.clipboard.writeText(cmd).then(function() {
+        var box = document.getElementById('installBox');
+        box.classList.add('copied');
+        setTimeout(function() {
+          box.classList.remove('copied');
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
