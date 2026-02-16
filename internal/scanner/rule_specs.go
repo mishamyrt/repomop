@@ -39,6 +39,10 @@ var defaultArtifactRules = []artifactRule{
 	pathSuffixRule(ArtifactRuby, []string{"vendor", "bundle"}, []string{"Gemfile"}),
 
 	namedDirRule(ArtifactPHP, "vendor", []string{"composer.json"}),
+
+	namedDirRule(ArtifactZig, "zig-out", []string{"build.zig"}),
+	namedDirRule(ArtifactZig, ".zig-cache", []string{"build.zig"}),
+
 	pythonVenvRule(),
 }
 

@@ -243,6 +243,40 @@ func TestScanPHPVendorRequiresComposerJSON(t *testing.T) {
 	}
 }
 
+func TestScanZigArtifacts(t *testing.T) {
+	root := t.TempDir()
+
+	project := filepath.Join(root, "zig-project")
+	mustMkdirAll(t, filepath.Join(project, "zig-out"))
+	mustMkdirAll(t, filepath.Join(project, ".zig-cache"))
+	mustWriteFile(t, filepath.Join(project, "build.zig"), "const std = @import(\"std\");")
+
+	orphan := filepath.Join(root, "orphan")
+	mustMkdirAll(t, filepath.Join(orphan, "zig-out"))
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+
+	for _, artifactPath := range []string{
+		filepath.Join(project, "zig-out"),
+		filepath.Join(project, ".zig-cache"),
+	} {
+		artifact, ok := artifactAtPath(artifacts, artifactPath)
+		if !ok {
+			t.Fatalf("expected zig artifact %s", artifactPath)
+		}
+		if artifact.Kind != ArtifactZig {
+			t.Fatalf("expected zig kind, got %s", artifact.Kind)
+		}
+		if artifact.ProjectRoot != project {
+			t.Fatalf("unexpected zig project root: %s", artifact.ProjectRoot)
+		}
+	}
+
+	if _, ok := artifactAtPath(artifacts, filepath.Join(orphan, "zig-out")); ok {
+		t.Fatalf("unexpected orphan zig-out artifact")
+	}
+}
+
 func TestScanBuildUsesNearestProjectMarker(t *testing.T) {
 	root := t.TempDir()
 

@@ -15,6 +15,7 @@ const (
 	ArtifactFlutter    ArtifactKind = "dart-flutter"
 	ArtifactRuby       ArtifactKind = "ruby"
 	ArtifactPHP        ArtifactKind = "php"
+	ArtifactZig        ArtifactKind = "zig"
 )
 
 // Artifact describes a single removable artifact directory.
