@@ -1,4 +1,4 @@
-VERSION := 0.4.0
+VERSION := 0.5.0
 
 .PHONY: all
 all: build
@@ -7,7 +7,7 @@ all: build
 build:
 	CGO_ENABLED=0 \
 		go build \
-			-ldflags "-s -w -X 'main.appVersion=${VERSION}'" \
+			-ldflags "-s -w -X 'main.appVersion=v${VERSION}'" \
 			-o repomop \
 			./cmd/repomop
 

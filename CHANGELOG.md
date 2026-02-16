@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/mishamyrt/repomop/compare/v0.4.0..v0.5.0) - 2026-02-16
+
+### 🚀 Features
+
+- Add version command
+
+### 🚜 Refactor
+
+- Clean up
+
+### 📚 Documentation
+
+- Add changelog
+
 ## [0.4.0](https://github.com/mishamyrt/repomop/compare/v0.3.0..v0.4.0) - 2026-02-16
 
 ### 🚀 Features

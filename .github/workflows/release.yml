@@ -36,9 +36,12 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          APP_VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p "dist/repomop_${GOOS}_${GOARCH}"
-          go build -trimpath -ldflags "-s -w" -o "dist/repomop_${GOOS}_${GOARCH}/repomop" ./cmd/repomop
+          go build -trimpath -ldflags \
+            "-s -w -X 'main.appVersion=${APP_VERSION}'" \
+            -o "dist/repomop_${GOOS}_${GOARCH}/repomop" ./cmd/repomop
           tar -C "dist/repomop_${GOOS}_${GOARCH}" -czf "dist/repomop_${GOOS}_${GOARCH}.tar.gz" repomop
 
       - name: Upload release archive
