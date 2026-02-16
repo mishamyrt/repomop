@@ -1,21 +1,22 @@
 package scanner
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"repomop/internal/testutil"
 )
 
 func TestScanNodeModulesRequiresPackageJSON(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "js-project")
-	mustMkdirAll(t, filepath.Join(project, "node_modules"))
-	mustWriteFile(t, filepath.Join(project, "package.json"), "{}")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
 
 	orphan := filepath.Join(root, "orphan")
-	mustMkdirAll(t, filepath.Join(orphan, "node_modules"))
+	testutil.MkdirAll(t, filepath.Join(orphan, "node_modules"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -35,11 +36,11 @@ func TestScanTargetRequiresCargoToml(t *testing.T) {
 	root := t.TempDir()
 
 	rustProject := filepath.Join(root, "rust")
-	mustMkdirAll(t, filepath.Join(rustProject, "target"))
-	mustWriteFile(t, filepath.Join(rustProject, "Cargo.toml"), "[package]\nname='x'\n")
+	testutil.MkdirAll(t, filepath.Join(rustProject, "target"))
+	testutil.WriteFile(t, filepath.Join(rustProject, "Cargo.toml"), "[package]\nname='x'\n")
 
 	other := filepath.Join(root, "other")
-	mustMkdirAll(t, filepath.Join(other, "target"))
+	testutil.MkdirAll(t, filepath.Join(other, "target"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -59,11 +60,11 @@ func TestScanSwiftBuildRequiresPackageSwift(t *testing.T) {
 	root := t.TempDir()
 
 	swiftProject := filepath.Join(root, "swift")
-	mustMkdirAll(t, filepath.Join(swiftProject, ".build"))
-	mustWriteFile(t, filepath.Join(swiftProject, "Package.swift"), "// swift-tools-version: 5.9")
+	testutil.MkdirAll(t, filepath.Join(swiftProject, ".build"))
+	testutil.WriteFile(t, filepath.Join(swiftProject, "Package.swift"), "// swift-tools-version: 5.9")
 
 	other := filepath.Join(root, "other")
-	mustMkdirAll(t, filepath.Join(other, ".build"))
+	testutil.MkdirAll(t, filepath.Join(other, ".build"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -83,10 +84,10 @@ func TestScanGradleArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "gradle")
-	mustMkdirAll(t, filepath.Join(project, ".gradle"))
-	mustMkdirAll(t, filepath.Join(project, "build"))
-	mustMkdirAll(t, filepath.Join(project, "out"))
-	mustWriteFile(t, filepath.Join(project, "settings.gradle"), "rootProject.name = 'x'")
+	testutil.MkdirAll(t, filepath.Join(project, ".gradle"))
+	testutil.MkdirAll(t, filepath.Join(project, "build"))
+	testutil.MkdirAll(t, filepath.Join(project, "out"))
+	testutil.WriteFile(t, filepath.Join(project, "settings.gradle"), "rootProject.name = 'x'")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -112,15 +113,15 @@ func TestScanTargetSupportsMavenAndRust(t *testing.T) {
 	root := t.TempDir()
 
 	rustProject := filepath.Join(root, "rust")
-	mustMkdirAll(t, filepath.Join(rustProject, "target"))
-	mustWriteFile(t, filepath.Join(rustProject, "Cargo.toml"), "[package]\nname='x'\n")
+	testutil.MkdirAll(t, filepath.Join(rustProject, "target"))
+	testutil.WriteFile(t, filepath.Join(rustProject, "Cargo.toml"), "[package]\nname='x'\n")
 
 	mavenProject := filepath.Join(root, "maven")
-	mustMkdirAll(t, filepath.Join(mavenProject, "target"))
-	mustWriteFile(t, filepath.Join(mavenProject, "pom.xml"), "<project/>")
+	testutil.MkdirAll(t, filepath.Join(mavenProject, "target"))
+	testutil.WriteFile(t, filepath.Join(mavenProject, "pom.xml"), "<project/>")
 
 	orphan := filepath.Join(root, "orphan")
-	mustMkdirAll(t, filepath.Join(orphan, "target"))
+	testutil.MkdirAll(t, filepath.Join(orphan, "target"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -149,10 +150,10 @@ func TestScanCMakeArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "cmake")
-	mustMkdirAll(t, filepath.Join(project, "build"))
-	mustMkdirAll(t, filepath.Join(project, "cmake-build-debug"))
-	mustMkdirAll(t, filepath.Join(project, "CMakeFiles"))
-	mustWriteFile(t, filepath.Join(project, "CMakeLists.txt"), "cmake_minimum_required(VERSION 3.20)")
+	testutil.MkdirAll(t, filepath.Join(project, "build"))
+	testutil.MkdirAll(t, filepath.Join(project, "cmake-build-debug"))
+	testutil.MkdirAll(t, filepath.Join(project, "CMakeFiles"))
+	testutil.WriteFile(t, filepath.Join(project, "CMakeLists.txt"), "cmake_minimum_required(VERSION 3.20)")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -175,9 +176,9 @@ func TestScanFlutterArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "flutter")
-	mustMkdirAll(t, filepath.Join(project, ".dart_tool"))
-	mustMkdirAll(t, filepath.Join(project, "build"))
-	mustWriteFile(t, filepath.Join(project, "pubspec.yaml"), "name: x")
+	testutil.MkdirAll(t, filepath.Join(project, ".dart_tool"))
+	testutil.MkdirAll(t, filepath.Join(project, "build"))
+	testutil.WriteFile(t, filepath.Join(project, "pubspec.yaml"), "name: x")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -199,9 +200,9 @@ func TestScanRubyArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "ruby")
-	mustMkdirAll(t, filepath.Join(project, ".bundle"))
-	mustMkdirAll(t, filepath.Join(project, "vendor", "bundle"))
-	mustWriteFile(t, filepath.Join(project, "Gemfile"), "source 'https://rubygems.org'")
+	testutil.MkdirAll(t, filepath.Join(project, ".bundle"))
+	testutil.MkdirAll(t, filepath.Join(project, "vendor", "bundle"))
+	testutil.WriteFile(t, filepath.Join(project, "Gemfile"), "source 'https://rubygems.org'")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -223,11 +224,11 @@ func TestScanPHPVendorRequiresComposerJSON(t *testing.T) {
 	root := t.TempDir()
 
 	phpProject := filepath.Join(root, "php")
-	mustMkdirAll(t, filepath.Join(phpProject, "vendor"))
-	mustWriteFile(t, filepath.Join(phpProject, "composer.json"), "{}")
+	testutil.MkdirAll(t, filepath.Join(phpProject, "vendor"))
+	testutil.WriteFile(t, filepath.Join(phpProject, "composer.json"), "{}")
 
 	orphan := filepath.Join(root, "orphan")
-	mustMkdirAll(t, filepath.Join(orphan, "vendor"))
+	testutil.MkdirAll(t, filepath.Join(orphan, "vendor"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -247,12 +248,12 @@ func TestScanZigArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	project := filepath.Join(root, "zig-project")
-	mustMkdirAll(t, filepath.Join(project, "zig-out"))
-	mustMkdirAll(t, filepath.Join(project, ".zig-cache"))
-	mustWriteFile(t, filepath.Join(project, "build.zig"), "const std = @import(\"std\");")
+	testutil.MkdirAll(t, filepath.Join(project, "zig-out"))
+	testutil.MkdirAll(t, filepath.Join(project, ".zig-cache"))
+	testutil.WriteFile(t, filepath.Join(project, "build.zig"), "const std = @import(\"std\");")
 
 	orphan := filepath.Join(root, "orphan")
-	mustMkdirAll(t, filepath.Join(orphan, "zig-out"))
+	testutil.MkdirAll(t, filepath.Join(orphan, "zig-out"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -280,11 +281,11 @@ func TestScanZigArtifacts(t *testing.T) {
 func TestScanBuildUsesNearestProjectMarker(t *testing.T) {
 	root := t.TempDir()
 
-	mustWriteFile(t, filepath.Join(root, "settings.gradle"), "rootProject.name = 'mono'")
+	testutil.WriteFile(t, filepath.Join(root, "settings.gradle"), "rootProject.name = 'mono'")
 
 	flutterProject := filepath.Join(root, "apps", "flutter-app")
-	mustMkdirAll(t, filepath.Join(flutterProject, "build"))
-	mustWriteFile(t, filepath.Join(flutterProject, "pubspec.yaml"), "name: app")
+	testutil.MkdirAll(t, filepath.Join(flutterProject, "build"))
+	testutil.WriteFile(t, filepath.Join(flutterProject, "pubspec.yaml"), "name: app")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 	artifact, ok := artifactAtPath(artifacts, filepath.Join(flutterProject, "build"))
@@ -304,8 +305,8 @@ func TestScanVirtualEnvByPyvenvCfg(t *testing.T) {
 
 	project := filepath.Join(root, "python")
 	venv := filepath.Join(project, "custom_env")
-	mustMkdirAll(t, venv)
-	mustWriteFile(t, filepath.Join(venv, "pyvenv.cfg"), "home = /usr/bin")
+	testutil.MkdirAll(t, venv)
+	testutil.WriteFile(t, filepath.Join(venv, "pyvenv.cfg"), "home = /usr/bin")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -326,9 +327,9 @@ func TestScanVirtualEnvByBinMarkers(t *testing.T) {
 
 	project := filepath.Join(root, "python")
 	venv := filepath.Join(project, "sandbox")
-	mustMkdirAll(t, filepath.Join(venv, "bin"))
-	mustWriteFile(t, filepath.Join(venv, "bin", "activate"), "source")
-	mustWriteFile(t, filepath.Join(venv, "bin", "python"), "")
+	testutil.MkdirAll(t, filepath.Join(venv, "bin"))
+	testutil.WriteFile(t, filepath.Join(venv, "bin", "activate"), "source")
+	testutil.WriteFile(t, filepath.Join(venv, "bin", "python"), "")
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -348,10 +349,10 @@ func TestScanSkipsSymlinkDirectories(t *testing.T) {
 
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
-	mustMkdirAll(t, filepath.Join(project, "node_modules"))
-	mustWriteFile(t, filepath.Join(project, "package.json"), "{}")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
 
-	mustSymlink(t, project, filepath.Join(root, "project-link"))
+	testutil.Symlink(t, project, filepath.Join(root, "project-link"))
 
 	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
 
@@ -365,8 +366,8 @@ func TestScanRespectsMaxDepth(t *testing.T) {
 	root := t.TempDir()
 
 	nested := filepath.Join(root, "a", "b", "c")
-	mustMkdirAll(t, filepath.Join(nested, "node_modules"))
-	mustWriteFile(t, filepath.Join(nested, "package.json"), "{}")
+	testutil.MkdirAll(t, filepath.Join(nested, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(nested, "package.json"), "{}")
 
 	artifactsDepth2 := mustScan(t, ScanOptions{RootPath: root, MaxDepth: 2})
 	if len(artifactsByKind(artifactsDepth2, ArtifactNodeModule)) != 0 {
@@ -381,7 +382,7 @@ func TestScanRespectsMaxDepth(t *testing.T) {
 
 func mustScan(t *testing.T, opts ScanOptions) []Artifact {
 	t.Helper()
-	artifacts, err := Scan(opts)
+	artifacts, _, err := Scan(opts)
 	if err != nil {
 		t.Fatalf("scan failed: %v", err)
 	}
@@ -407,23 +408,3 @@ func artifactAtPath(artifacts []Artifact, path string) (Artifact, bool) {
 	return Artifact{}, false
 }
 
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", path, err)
-	}
-}
-
-func mustWriteFile(t *testing.T, path string, content string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-}
-
-func mustSymlink(t *testing.T, target string, path string) {
-	t.Helper()
-	if err := os.Symlink(target, path); err != nil {
-		t.Fatalf("symlink %s -> %s: %v", path, target, err)
-	}
-}

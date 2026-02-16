@@ -1,21 +1,23 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"repomop/internal/delete"
 	"repomop/internal/format"
+	"repomop/internal/pathutil"
 	"repomop/internal/scanner"
-	"repomop/internal/size"
 	"repomop/internal/tui"
 )
+
+var errHelp = errors.New("help requested")
 
 type cliOptions struct {
 	path     string
@@ -29,8 +31,11 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) int {
-	opts, err := parseFlags(args)
+	opts, err := parseFlags(args, stdout)
 	if err != nil {
+		if errors.Is(err, errHelp) {
+			return 0
+		}
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -42,13 +47,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	scanOpts := scanner.ScanOptions{
-		RootPath:       rootPath,
-		MaxDepth:       opts.maxDepth,
-		FollowSymlinks: false,
+		RootPath: rootPath,
+		MaxDepth: opts.maxDepth,
 	}
 
 	if opts.dryRun || opts.yes {
-		artifacts, warnings, err := scanAndMeasure(scanOpts)
+		artifacts, warnings, err := scanner.ScanAndMeasure(scanOpts)
 		if err != nil {
 			fmt.Fprintf(stderr, "scan failed: %v\n", err)
 			return 1
@@ -61,6 +65,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result := delete.Artifacts(artifacts)
 		printDeleteSummary(stdout, rootPath, artifacts, warnings, result)
+		if len(result.Errors) > 0 {
+			return 1
+		}
 		return 0
 	}
 
@@ -85,7 +92,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
-func parseFlags(args []string) (cliOptions, error) {
+func parseFlags(args []string, stdout io.Writer) (cliOptions, error) {
 	var opts cliOptions
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -100,6 +107,11 @@ func parseFlags(args []string) (cliOptions, error) {
 	fs.BoolVar(&opts.yes, "yes", false, "delete all found artifacts without interactive confirmation")
 
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fs.SetOutput(stdout)
+			fs.Usage()
+			return opts, errHelp
+		}
 		return opts, err
 	}
 	if opts.maxDepth < -1 {
@@ -110,32 +122,6 @@ func parseFlags(args []string) (cliOptions, error) {
 	}
 
 	return opts, nil
-}
-
-func scanAndMeasure(opts scanner.ScanOptions) ([]scanner.Artifact, []error, error) {
-	artifacts, err := scanner.Scan(opts)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	paths := make([]string, 0, len(artifacts))
-	for _, artifact := range artifacts {
-		paths = append(paths, artifact.Path)
-	}
-
-	sizes, warnings := size.Directories(paths, size.RecommendedWorkerCount())
-	for i := range artifacts {
-		artifacts[i].SizeBytes = sizes[artifacts[i].Path]
-	}
-
-	sort.SliceStable(artifacts, func(i int, j int) bool {
-		if artifacts[i].SizeBytes == artifacts[j].SizeBytes {
-			return artifacts[i].Path < artifacts[j].Path
-		}
-		return artifacts[i].SizeBytes > artifacts[j].SizeBytes
-	})
-
-	return artifacts, warnings, nil
 }
 
 func printDryRun(stdout io.Writer, root string, artifacts []scanner.Artifact, warnings []error) {
@@ -150,7 +136,7 @@ func printDryRun(stdout io.Writer, root string, artifacts []scanner.Artifact, wa
 		total += artifact.SizeBytes
 		fmt.Fprintf(stdout, "- %8s  %s  %s\n",
 			format.Bytes(artifact.SizeBytes),
-			relativePathOrSelf(root, artifact.Path),
+			pathutil.RelativePathOrSelf(root, artifact.Path),
 			artifact.Kind,
 		)
 	}
@@ -174,7 +160,7 @@ func printDeleteSummary(stdout io.Writer, root string, artifacts []scanner.Artif
 	if len(result.Errors) > 0 {
 		fmt.Fprintf(stdout, "Delete errors: %d\n", len(result.Errors))
 		for _, item := range result.Errors {
-			fmt.Fprintf(stdout, "- %s: %v\n", relativePathOrSelf(root, item.Artifact.Path), item.Err)
+			fmt.Fprintf(stdout, "- %s: %v\n", pathutil.RelativePathOrSelf(root, item.Artifact.Path), item.Err)
 		}
 	}
 	if len(warnings) > 0 {
@@ -182,13 +168,3 @@ func printDeleteSummary(stdout io.Writer, root string, artifacts []scanner.Artif
 	}
 }
 
-func relativePathOrSelf(root string, path string) string {
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return path
-	}
-	if rel == "." {
-		return path
-	}
-	return rel
-}

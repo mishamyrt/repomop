@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"repomop/internal/scanner"
+	"repomop/internal/testutil"
 )
 
 func TestArtifactsDeletesSelectedDirectories(t *testing.T) {
@@ -13,10 +14,10 @@ func TestArtifactsDeletesSelectedDirectories(t *testing.T) {
 	one := filepath.Join(root, "one")
 	two := filepath.Join(root, "two")
 
-	mustMkdirAll(t, one)
-	mustMkdirAll(t, two)
-	mustWriteFile(t, filepath.Join(one, "a.bin"), 10)
-	mustWriteFile(t, filepath.Join(two, "b.bin"), 20)
+	testutil.MkdirAll(t, one)
+	testutil.MkdirAll(t, two)
+	testutil.WriteFileSized(t, filepath.Join(one, "a.bin"), 10)
+	testutil.WriteFileSized(t, filepath.Join(two, "b.bin"), 20)
 
 	selected := []scanner.Artifact{
 		{Kind: scanner.ArtifactNodeModule, Path: one, ProjectRoot: root, SizeBytes: 10},
@@ -41,17 +42,3 @@ func TestArtifactsDeletesSelectedDirectories(t *testing.T) {
 	}
 }
 
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", path, err)
-	}
-}
-
-func mustWriteFile(t *testing.T, path string, size int) {
-	t.Helper()
-	content := make([]byte, size)
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-}

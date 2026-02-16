@@ -1,5 +1,7 @@
 package scanner
 
+import "sort"
+
 // ArtifactKind classifies supported removable development artifacts.
 type ArtifactKind string
 
@@ -26,9 +28,18 @@ type Artifact struct {
 	SizeBytes   int64
 }
 
+// SortBySizeDesc sorts artifacts by SizeBytes descending, then by Path ascending.
+func SortBySizeDesc(artifacts []Artifact) {
+	sort.SliceStable(artifacts, func(i, j int) bool {
+		if artifacts[i].SizeBytes == artifacts[j].SizeBytes {
+			return artifacts[i].Path < artifacts[j].Path
+		}
+		return artifacts[i].SizeBytes > artifacts[j].SizeBytes
+	})
+}
+
 // ScanOptions configures repository scanning.
 type ScanOptions struct {
-	RootPath       string
-	MaxDepth       int
-	FollowSymlinks bool
+	RootPath string
+	MaxDepth int
 }

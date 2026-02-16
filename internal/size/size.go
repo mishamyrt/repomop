@@ -8,9 +8,9 @@ import (
 )
 
 type jobResult struct {
-	path string
-	size int64
-	err  error
+	path     string
+	size     int64
+	warnings []error
 }
 
 // RecommendedWorkerCount returns a bounded worker count for responsive scans.
@@ -45,8 +45,8 @@ func Directories(paths []string, workers int) (map[string]int64, []error) {
 		go func() {
 			defer wg.Done()
 			for path := range jobs {
-				size, err := directorySize(path)
-				results <- jobResult{path: path, size: size, err: err}
+				size, warnings := directorySize(path)
+				results <- jobResult{path: path, size: size, warnings: warnings}
 			}
 		}()
 	}
@@ -60,23 +60,26 @@ func Directories(paths []string, workers int) (map[string]int64, []error) {
 		close(results)
 	}()
 
-	errs := make([]error, 0)
+	var warnings []error
 	for result := range results {
 		sizes[result.path] = result.size
-		if result.err != nil {
-			errs = append(errs, result.err)
-		}
+		warnings = append(warnings, result.warnings...)
 	}
 
-	return sizes, errs
+	return sizes, warnings
 }
 
-func directorySize(path string) (int64, error) {
+func directorySize(path string) (int64, []error) {
 	var total int64
+	var warnings []error
 
-	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			warnings = append(warnings, err)
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		if d.Type()&fs.ModeSymlink != 0 {
@@ -92,11 +95,12 @@ func directorySize(path string) (int64, error) {
 
 		info, err := d.Info()
 		if err != nil {
-			return err
+			warnings = append(warnings, err)
+			return nil
 		}
 		total += reclaimableFileSize(info)
 		return nil
 	})
 
-	return total, err
+	return total, warnings
 }

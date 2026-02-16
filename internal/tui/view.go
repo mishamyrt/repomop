@@ -8,6 +8,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"repomop/internal/format"
+	"repomop/internal/pathutil"
+	"repomop/internal/scanner"
 )
 
 var (
@@ -65,27 +67,18 @@ func (m Model) renderLoadingView() string {
 func (m Model) renderListView() string {
 	lines := make([]string, 0, len(m.artifacts)+8)
 
-	selectedCount := m.selectedCount()
-	selectedSize := int64(0)
-	for idx, chosen := range m.selected {
-		if chosen && idx >= 0 && idx < len(m.artifacts) {
-			selectedSize += m.artifacts[idx].SizeBytes
-		}
-	}
-
 	helpText := "↑↓ | Space select | q quit"
-	if selectedCount > 0 {
+	if m.selectedCount > 0 {
 		helpText = "↑↓ | Space select | Enter confirm | q quit"
 	}
 
 	lines = append(lines, subtitleStyle.Render(fmt.Sprintf("Found %d artifacts", len(m.artifacts))))
-	lines = append(lines, summaryStyle.Render(fmt.Sprintf("Selected %d · Reclaimable %s", selectedCount, format.Bytes(selectedSize))))
+	lines = append(lines, summaryStyle.Render(fmt.Sprintf("Selected %d · Reclaimable %s", m.selectedCount, format.Bytes(m.selectedSize))))
 	lines = append(lines, "")
 
-	sizeWidth := m.sizeColumnWidth()
 	start, end := m.visibleRange()
 	for idx := start; idx < end; idx++ {
-		lines = append(lines, m.renderArtifactLine(idx, sizeWidth))
+		lines = append(lines, m.renderArtifactLine(idx, m.sizeColumnWidth))
 	}
 
 	if m.message != "" {
@@ -109,7 +102,7 @@ func (m Model) renderArtifactLine(idx int, sizeWidth int) string {
 		markerRenderer = selectedMarkerStyle
 	}
 
-	path := relativePathOrSelf(m.opts.RootPath, artifact.Path)
+	path := pathutil.RelativePathOrSelf(m.opts.RootPath, artifact.Path)
 	pathWidth := m.pathColumnWidth(sizeWidth, string(artifact.Kind), focused)
 	pathTextRaw := truncatePathLeft(path, pathWidth)
 
@@ -166,7 +159,7 @@ func (m Model) renderConfirmView() string {
 		}
 		for i := 0; i < limit; i++ {
 			artifact := selected[i]
-			lines = append(lines, fmt.Sprintf("- %s (%s)", relativePathOrSelf(m.opts.RootPath, artifact.Path), format.Bytes(artifact.SizeBytes)))
+			lines = append(lines, fmt.Sprintf("- %s (%s)", pathutil.RelativePathOrSelf(m.opts.RootPath, artifact.Path), format.Bytes(artifact.SizeBytes)))
 		}
 		if len(selected) > limit {
 			lines = append(lines, dimStyle.Render(fmt.Sprintf("... and %d more", len(selected)-limit)))
@@ -211,7 +204,7 @@ func (m Model) renderDoneView() string {
 		lines = append(lines, "")
 		lines = append(lines, errStyle.Render("Errors:"))
 		for _, item := range m.deleteResult.Errors {
-			lines = append(lines, errStyle.Render(fmt.Sprintf("- %s: %v", relativePathOrSelf(m.opts.RootPath, item.Artifact.Path), item.Err)))
+			lines = append(lines, errStyle.Render(fmt.Sprintf("- %s: %v", pathutil.RelativePathOrSelf(m.opts.RootPath, item.Artifact.Path), item.Err)))
 		}
 	}
 
@@ -240,11 +233,15 @@ func (m Model) renderErrorView() string {
 	return strings.Join(lines, "\n")
 }
 
+// listViewChromeLines is the number of non-list lines in list view:
+// subtitle + summary + blank + (warning + blank) + help.
+const listViewChromeLines = 6
+
 func (m Model) visibleRange() (int, int) {
 	if len(m.artifacts) == 0 {
 		return 0, 0
 	}
-	listHeight := m.height - 6
+	listHeight := m.height - listViewChromeLines
 	if listHeight < 5 {
 		listHeight = 5
 	}
@@ -267,9 +264,9 @@ func (m Model) visibleRange() (int, int) {
 	return start, end
 }
 
-func (m Model) sizeColumnWidth() int {
+func computeSizeColumnWidth(artifacts []scanner.Artifact) int {
 	width := lipgloss.Width(format.Bytes(0))
-	for _, artifact := range m.artifacts {
+	for _, artifact := range artifacts {
 		current := lipgloss.Width(format.Bytes(artifact.SizeBytes))
 		if current > width {
 			width = current
@@ -400,16 +397,3 @@ func tailByWidth(value string, maxWidth int) string {
 	return string(tail)
 }
 
-func relativePathOrSelf(root string, path string) string {
-	if root == "" || path == "" {
-		return path
-	}
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return path
-	}
-	if rel == "." {
-		return path
-	}
-	return rel
-}

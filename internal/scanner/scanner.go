@@ -12,28 +12,33 @@ type walkItem struct {
 	depth int
 }
 
+// initialArtifactCapacity is a pre-allocation hint for typical project counts.
+const initialArtifactCapacity = 64
+
 // Scan recursively traverses the root directory and finds known build artifacts.
-func Scan(opts ScanOptions) ([]Artifact, error) {
+// Non-fatal directory read errors are collected as warnings instead of aborting.
+func Scan(opts ScanOptions) ([]Artifact, []error, error) {
 	if opts.RootPath == "" {
-		return nil, fmt.Errorf("root path is required")
+		return nil, nil, fmt.Errorf("root path is required")
 	}
 
 	root, err := filepath.Abs(opts.RootPath)
 	if err != nil {
-		return nil, fmt.Errorf("resolve root path: %w", err)
+		return nil, nil, fmt.Errorf("resolve root path: %w", err)
 	}
 	root = filepath.Clean(root)
 
 	rootInfo, err := os.Stat(root)
 	if err != nil {
-		return nil, fmt.Errorf("stat root path: %w", err)
+		return nil, nil, fmt.Errorf("stat root path: %w", err)
 	}
 	if !rootInfo.IsDir() {
-		return nil, fmt.Errorf("root path is not a directory: %s", root)
+		return nil, nil, fmt.Errorf("root path is not a directory: %s", root)
 	}
 
 	stack := []walkItem{{path: root, depth: 0}}
-	artifacts := make([]Artifact, 0, 64)
+	artifacts := make([]Artifact, 0, initialArtifactCapacity)
+	var warnings []error
 
 	for len(stack) > 0 {
 		item := stack[len(stack)-1]
@@ -41,14 +46,12 @@ func Scan(opts ScanOptions) ([]Artifact, error) {
 
 		entries, err := os.ReadDir(item.path)
 		if err != nil {
-			return nil, fmt.Errorf("read directory %s: %w", item.path, err)
+			warnings = append(warnings, fmt.Errorf("read directory %s: %w", item.path, err))
+			continue
 		}
 
 		for _, entry := range entries {
 			if !entry.IsDir() {
-				if entry.Type()&fs.ModeSymlink != 0 {
-					continue
-				}
 				continue
 			}
 			if entry.Type()&fs.ModeSymlink != 0 {
@@ -70,5 +73,5 @@ func Scan(opts ScanOptions) ([]Artifact, error) {
 		}
 	}
 
-	return artifacts, nil
+	return artifacts, warnings, nil
 }

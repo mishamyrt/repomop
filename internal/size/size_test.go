@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"repomop/internal/testutil"
 )
 
 func TestDirectoriesCalculatesNestedSize(t *testing.T) {
@@ -12,12 +14,12 @@ func TestDirectoriesCalculatesNestedSize(t *testing.T) {
 	dirA := filepath.Join(root, "a")
 	dirB := filepath.Join(root, "b")
 
-	mustMkdirAll(t, filepath.Join(dirA, "nested"))
-	mustMkdirAll(t, dirB)
+	testutil.MkdirAll(t, filepath.Join(dirA, "nested"))
+	testutil.MkdirAll(t, dirB)
 
-	mustWriteFileSized(t, filepath.Join(dirA, "nested", "f1.bin"), 10)
-	mustWriteFileSized(t, filepath.Join(dirA, "nested", "f2.bin"), 15)
-	mustWriteFileSized(t, filepath.Join(dirB, "f3.bin"), 8)
+	testutil.WriteFileSized(t, filepath.Join(dirA, "nested", "f1.bin"), 10)
+	testutil.WriteFileSized(t, filepath.Join(dirA, "nested", "f2.bin"), 15)
+	testutil.WriteFileSized(t, filepath.Join(dirB, "f3.bin"), 8)
 
 	sizes, errs := Directories([]string{dirA, dirB}, 2)
 	if len(errs) != 0 {
@@ -32,12 +34,6 @@ func TestDirectoriesCalculatesNestedSize(t *testing.T) {
 	}
 }
 
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", path, err)
-	}
-}
 
 func TestDirectoriesExcludesHardLinkedFiles(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -47,16 +43,16 @@ func TestDirectoriesExcludesHardLinkedFiles(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "node_modules")
 	storeDir := filepath.Join(root, "store")
-	mustMkdirAll(t, dir)
-	mustMkdirAll(t, storeDir)
+	testutil.MkdirAll(t, dir)
+	testutil.MkdirAll(t, storeDir)
 
 	// Create a regular (unique) file – should be counted.
-	mustWriteFileSized(t, filepath.Join(dir, "unique.bin"), 100)
+	testutil.WriteFileSized(t, filepath.Join(dir, "unique.bin"), 100)
 
 	// Create a file in the "store" and hard-link it into the directory.
 	// The hard-linked copy has Nlink > 1 and should NOT be counted.
 	storePath := filepath.Join(storeDir, "shared.bin")
-	mustWriteFileSized(t, storePath, 200)
+	testutil.WriteFileSized(t, storePath, 200)
 	linkPath := filepath.Join(dir, "shared.bin")
 	if err := os.Link(storePath, linkPath); err != nil {
 		t.Fatalf("hard link: %v", err)
@@ -76,10 +72,10 @@ func TestDirectoriesExcludesHardLinkedFiles(t *testing.T) {
 func TestDirectoriesCountsAllWhenNoHardLinks(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plain")
-	mustMkdirAll(t, dir)
+	testutil.MkdirAll(t, dir)
 
-	mustWriteFileSized(t, filepath.Join(dir, "a.bin"), 30)
-	mustWriteFileSized(t, filepath.Join(dir, "b.bin"), 70)
+	testutil.WriteFileSized(t, filepath.Join(dir, "a.bin"), 30)
+	testutil.WriteFileSized(t, filepath.Join(dir, "b.bin"), 70)
 
 	sizes, errs := Directories([]string{dir}, 1)
 	if len(errs) != 0 {
@@ -91,10 +87,3 @@ func TestDirectoriesCountsAllWhenNoHardLinks(t *testing.T) {
 	}
 }
 
-func mustWriteFileSized(t *testing.T, path string, size int) {
-	t.Helper()
-	content := make([]byte, size)
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-}

@@ -100,7 +100,7 @@ func pythonVenvRule() artifactRule {
 }
 
 func markerMatch(path string, root string, markers []string) (ruleMatch, bool) {
-	projectRoot, ok := findNearestAncestorWithMarker(path, root, markers)
+	projectRoot, ok := findNearestAncestorWithMarker(filepath.Dir(path), root, markers)
 	if !ok {
 		return ruleMatch{}, false
 	}

@@ -27,13 +27,16 @@ func TestRenderListViewUsesFzfLikeMarkersAndFormat(t *testing.T) {
 	}
 
 	model := Model{
-		opts:      scanner.ScanOptions{RootPath: root},
-		state:     stateList,
-		artifacts: artifacts,
-		selected:  map[int]bool{0: true},
-		cursor:    0,
-		width:     120,
-		height:    30,
+		opts:            scanner.ScanOptions{RootPath: root},
+		state:           stateList,
+		artifacts:       artifacts,
+		selected:        map[int]bool{0: true},
+		selectedCount:   1,
+		selectedSize:    2048,
+		sizeColumnWidth: computeSizeColumnWidth(artifacts),
+		cursor:          0,
+		width:           120,
+		height:          30,
 	}
 
 	output := stripANSI(model.renderListView())
@@ -78,13 +81,14 @@ func TestRenderListViewTruncatesPathFromLeft(t *testing.T) {
 	}
 
 	model := Model{
-		opts:      scanner.ScanOptions{RootPath: root},
-		state:     stateList,
-		artifacts: artifacts,
-		selected:  map[int]bool{},
-		cursor:    0,
-		width:     43,
-		height:    20,
+		opts:            scanner.ScanOptions{RootPath: root},
+		state:           stateList,
+		artifacts:       artifacts,
+		selected:        map[int]bool{},
+		sizeColumnWidth: computeSizeColumnWidth(artifacts),
+		cursor:          0,
+		width:           43,
+		height:          20,
 	}
 
 	output := stripANSI(model.renderListView())
@@ -114,13 +118,14 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 	}
 
 	base := Model{
-		opts:      scanner.ScanOptions{RootPath: root},
-		state:     stateList,
-		artifacts: artifacts,
-		selected:  map[int]bool{},
-		cursor:    0,
-		width:     120,
-		height:    30,
+		opts:            scanner.ScanOptions{RootPath: root},
+		state:           stateList,
+		artifacts:       artifacts,
+		selected:        map[int]bool{},
+		sizeColumnWidth: computeSizeColumnWidth(artifacts),
+		cursor:          0,
+		width:           120,
+		height:          30,
 	}
 
 	outputNoSelection := stripANSI(base.renderListView())
@@ -165,6 +170,8 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 
 	withSelection := base
 	withSelection.selected = map[int]bool{0: true}
+	withSelection.selectedCount = 1
+	withSelection.selectedSize = 1024
 	outputWithSelection := stripANSI(withSelection.renderListView())
 	if !strings.Contains(outputWithSelection, "↑↓ | Space select | Enter confirm | q quit") {
 		t.Fatalf("help must include Enter confirm when selection exists:\n%s", outputWithSelection)

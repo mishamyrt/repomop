@@ -1,14 +1,11 @@
 package tui
 
 import (
-	"sort"
-
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"repomop/internal/delete"
+	deleter "repomop/internal/delete"
 	"repomop/internal/scanner"
-	"repomop/internal/size"
 )
 
 type viewState int
@@ -29,7 +26,7 @@ type scanFinishedMsg struct {
 }
 
 type deleteFinishedMsg struct {
-	result delete.Result
+	result deleter.Result
 }
 
 // Model is the Bubble Tea application state.
@@ -43,7 +40,11 @@ type Model struct {
 	selected     map[int]bool
 	cursor       int
 	scanWarnings []error
-	deleteResult delete.Result
+	deleteResult deleter.Result
+
+	selectedCount   int
+	selectedSize    int64
+	sizeColumnWidth int
 
 	message  string
 	fatalErr error
@@ -90,6 +91,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scanWarnings = typed.warnings
 		m.selected = make(map[int]bool, len(typed.artifacts))
 		m.cursor = 0
+		m.selectedCount = 0
+		m.selectedSize = 0
+		m.sizeColumnWidth = computeSizeColumnWidth(typed.artifacts)
 		if len(typed.artifacts) == 0 {
 			m.state = stateDone
 			m.message = "No artifacts found."
@@ -125,13 +129,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor < len(m.artifacts)-1 {
 					m.cursor++
 				}
-			case keyMatches(typed, " "):
-				if len(m.artifacts) > 0 {
-					idx := m.cursor
-					m.selected[idx] = !m.selected[idx]
+		case keyMatches(typed, " "):
+			if len(m.artifacts) > 0 {
+				idx := m.cursor
+				if m.selected[idx] {
+					delete(m.selected, idx)
+					m.selectedCount--
+					m.selectedSize -= m.artifacts[idx].SizeBytes
+				} else {
+					m.selected[idx] = true
+					m.selectedCount++
+					m.selectedSize += m.artifacts[idx].SizeBytes
 				}
-			case keyMatches(typed, "enter"):
-				if m.selectedCount() == 0 {
+			}
+		case keyMatches(typed, "enter"):
+			if m.selectedCount == 0 {
 					break
 				}
 				m.state = stateConfirm
@@ -183,34 +195,16 @@ func (m Model) selectedArtifacts() []scanner.Artifact {
 		return nil
 	}
 	selected := make([]scanner.Artifact, 0, len(m.selected))
-	for idx, chosen := range m.selected {
-		if !chosen {
-			continue
-		}
+	for idx := range m.selected {
 		if idx < 0 || idx >= len(m.artifacts) {
 			continue
 		}
 		selected = append(selected, m.artifacts[idx])
 	}
 
-	sort.SliceStable(selected, func(i int, j int) bool {
-		if selected[i].SizeBytes == selected[j].SizeBytes {
-			return selected[i].Path < selected[j].Path
-		}
-		return selected[i].SizeBytes > selected[j].SizeBytes
-	})
+	scanner.SortBySizeDesc(selected)
 
 	return selected
-}
-
-func (m Model) selectedCount() int {
-	count := 0
-	for _, selected := range m.selected {
-		if selected {
-			count++
-		}
-	}
-	return count
 }
 
 func keyMatches(msg tea.KeyMsg, keys ...string) bool {
@@ -225,35 +219,17 @@ func keyMatches(msg tea.KeyMsg, keys ...string) bool {
 
 func scanArtifactsCmd(opts scanner.ScanOptions) tea.Cmd {
 	return func() tea.Msg {
-		artifacts, err := scanner.Scan(opts)
+		artifacts, warnings, err := scanner.ScanAndMeasure(opts)
 		if err != nil {
 			return scanFinishedMsg{err: err}
 		}
-
-		paths := make([]string, 0, len(artifacts))
-		for _, artifact := range artifacts {
-			paths = append(paths, artifact.Path)
-		}
-
-		sizes, warnings := size.Directories(paths, size.RecommendedWorkerCount())
-		for idx := range artifacts {
-			artifacts[idx].SizeBytes = sizes[artifacts[idx].Path]
-		}
-
-		sort.SliceStable(artifacts, func(i int, j int) bool {
-			if artifacts[i].SizeBytes == artifacts[j].SizeBytes {
-				return artifacts[i].Path < artifacts[j].Path
-			}
-			return artifacts[i].SizeBytes > artifacts[j].SizeBytes
-		})
-
 		return scanFinishedMsg{artifacts: artifacts, warnings: warnings}
 	}
 }
 
 func deleteArtifactsCmd(artifacts []scanner.Artifact) tea.Cmd {
 	return func() tea.Msg {
-		result := delete.Artifacts(artifacts)
+		result := deleter.Artifacts(artifacts)
 		return deleteFinishedMsg{result: result}
 	}
 }
@@ -264,6 +240,6 @@ func (m Model) FatalError() error {
 }
 
 // DeleteResult returns deletion summary after the session completes.
-func (m Model) DeleteResult() delete.Result {
+func (m Model) DeleteResult() deleter.Result {
 	return m.deleteResult
 }

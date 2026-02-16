@@ -9,14 +9,15 @@ import (
 	"testing"
 
 	"repomop/internal/scanner"
+	"repomop/internal/testutil"
 )
 
 func TestRunDryRunDoesNotDelete(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
-	mustMkdirAll(t, filepath.Join(project, "node_modules"))
-	mustWriteFile(t, filepath.Join(project, "package.json"), "{}")
-	mustWriteFile(t, filepath.Join(project, "node_modules", "a.js"), "console.log('x')")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
+	testutil.WriteFile(t, filepath.Join(project, "node_modules", "a.js"), "console.log('x')")
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -36,14 +37,14 @@ func TestRunYesDeletesAllArtifacts(t *testing.T) {
 	root := t.TempDir()
 
 	jsProject := filepath.Join(root, "js")
-	mustMkdirAll(t, filepath.Join(jsProject, "node_modules"))
-	mustWriteFile(t, filepath.Join(jsProject, "package.json"), "{}")
-	mustWriteFile(t, filepath.Join(jsProject, "node_modules", "a.js"), "console.log('x')")
+	testutil.MkdirAll(t, filepath.Join(jsProject, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(jsProject, "package.json"), "{}")
+	testutil.WriteFile(t, filepath.Join(jsProject, "node_modules", "a.js"), "console.log('x')")
 
 	pyProject := filepath.Join(root, "py")
 	venv := filepath.Join(pyProject, "my_env")
-	mustMkdirAll(t, venv)
-	mustWriteFile(t, filepath.Join(venv, "pyvenv.cfg"), "home=/usr/bin")
+	testutil.MkdirAll(t, venv)
+	testutil.WriteFile(t, filepath.Join(venv, "pyvenv.cfg"), "home=/usr/bin")
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -100,16 +101,3 @@ func TestPrintDryRunUsesSizePathTypeFormat(t *testing.T) {
 	}
 }
 
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", path, err)
-	}
-}
-
-func mustWriteFile(t *testing.T, path string, content string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-}
