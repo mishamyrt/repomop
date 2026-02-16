@@ -17,13 +17,17 @@ import (
 	"repomop/internal/tui"
 )
 
-var errHelp = errors.New("help requested")
+var (
+	errHelp    = errors.New("help requested")
+	appVersion = "dev"
+)
 
 type cliOptions struct {
 	path     string
 	maxDepth int
 	dryRun   bool
 	yes      bool
+	version  bool
 }
 
 func main() {
@@ -38,6 +42,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stderr, err)
 		return 1
+	}
+
+	if opts.version {
+		fmt.Fprintln(stdout, appVersion)
+		return 0
 	}
 
 	rootPath, err := filepath.Abs(opts.path)
@@ -105,6 +114,7 @@ func parseFlags(args []string, stdout io.Writer) (cliOptions, error) {
 	fs.IntVar(&opts.maxDepth, "max-depth", -1, "max traversal depth (-1 means unlimited)")
 	fs.BoolVar(&opts.dryRun, "dry-run", false, "list artifacts without deleting")
 	fs.BoolVar(&opts.yes, "yes", false, "delete all found artifacts without interactive confirmation")
+	fs.BoolVar(&opts.version, "version", false, "print version and exit")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -167,4 +177,3 @@ func printDeleteSummary(stdout io.Writer, root string, artifacts []scanner.Artif
 		fmt.Fprintf(stdout, "Warnings: %d size calculation warnings\n", len(warnings))
 	}
 }
-

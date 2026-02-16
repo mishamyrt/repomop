@@ -5,7 +5,7 @@ all: build
 build:
 	CGO_ENABLED=0 \
 		go build \
-			-ldflags "-s -w" \
+			-ldflags "-s -w -X 'main.appVersion=${VERSION}'" \
 			-o repomop \
 			./cmd/repomop
 
