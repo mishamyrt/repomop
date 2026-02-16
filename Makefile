@@ -1,4 +1,5 @@
 VERSION := 0.5.0
+TEST_MODULES := $(shell go list ./... | grep -v -e /cmd/)
 
 .PHONY: all
 all: build
@@ -14,6 +15,11 @@ build:
 .PHONY: test
 test:
 	go test ./...
+
+.PHONY: coverage
+coverage:
+	go test -coverprofile=coverage.out $(TEST_MODULES)
+	go tool cover -html=coverage.out -o coverage.html
 
 .PHONY: lint
 lint:
