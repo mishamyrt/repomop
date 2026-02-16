@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -380,6 +381,312 @@ func TestScanRespectsMaxDepth(t *testing.T) {
 	}
 }
 
+// --- New tests for uncovered paths ---
+
+func TestScanEmptyRootPathReturnsError(t *testing.T) {
+	_, _, err := Scan(ScanOptions{RootPath: "", MaxDepth: -1})
+	if err == nil {
+		t.Fatal("expected error for empty root path")
+	}
+}
+
+func TestScanNonExistentRootReturnsError(t *testing.T) {
+	_, _, err := Scan(ScanOptions{RootPath: "/nonexistent/path/xyz", MaxDepth: -1})
+	if err == nil {
+		t.Fatal("expected error for nonexistent root path")
+	}
+}
+
+func TestScanFileAsRootReturnsError(t *testing.T) {
+	root := t.TempDir()
+	filePath := filepath.Join(root, "file.txt")
+	testutil.WriteFile(t, filePath, "not a dir")
+
+	_, _, err := Scan(ScanOptions{RootPath: filePath, MaxDepth: -1})
+	if err == nil {
+		t.Fatal("expected error for file as root")
+	}
+}
+
+func TestScanEmptyDirectoryReturnsNoArtifacts(t *testing.T) {
+	root := t.TempDir()
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+	if len(artifacts) != 0 {
+		t.Fatalf("expected 0 artifacts, got %d", len(artifacts))
+	}
+}
+
+func TestScanAndMeasureIntegration(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "js")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
+	testutil.WriteFileSized(t, filepath.Join(project, "node_modules", "dep.js"), 100)
+
+	artifacts, warnings, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	if err != nil {
+		t.Fatalf("ScanAndMeasure failed: %v", err)
+	}
+	_ = warnings
+
+	if len(artifacts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(artifacts))
+	}
+	if artifacts[0].SizeBytes <= 0 {
+		t.Fatalf("expected positive size, got %d", artifacts[0].SizeBytes)
+	}
+}
+
+func TestScanAndMeasureEmptyRootError(t *testing.T) {
+	_, _, err := ScanAndMeasure(ScanOptions{RootPath: "", MaxDepth: -1})
+	if err == nil {
+		t.Fatal("expected error for empty root")
+	}
+}
+
+func TestScanAndMeasureSortsBySize(t *testing.T) {
+	root := t.TempDir()
+
+	small := filepath.Join(root, "small")
+	testutil.MkdirAll(t, filepath.Join(small, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(small, "package.json"), "{}")
+	testutil.WriteFileSized(t, filepath.Join(small, "node_modules", "s.js"), 10)
+
+	big := filepath.Join(root, "big")
+	testutil.MkdirAll(t, filepath.Join(big, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(big, "package.json"), "{}")
+	testutil.WriteFileSized(t, filepath.Join(big, "node_modules", "b.js"), 1000)
+
+	artifacts, _, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	if err != nil {
+		t.Fatalf("ScanAndMeasure failed: %v", err)
+	}
+	if len(artifacts) != 2 {
+		t.Fatalf("expected 2 artifacts, got %d", len(artifacts))
+	}
+	if artifacts[0].SizeBytes < artifacts[1].SizeBytes {
+		t.Fatal("expected sorted by size descending")
+	}
+}
+
+func TestSortBySizeDesc(t *testing.T) {
+	artifacts := []Artifact{
+		{Path: "/a", SizeBytes: 100},
+		{Path: "/b", SizeBytes: 500},
+		{Path: "/c", SizeBytes: 200},
+	}
+	SortBySizeDesc(artifacts)
+	if artifacts[0].SizeBytes != 500 {
+		t.Fatalf("expected 500 first, got %d", artifacts[0].SizeBytes)
+	}
+	if artifacts[1].SizeBytes != 200 {
+		t.Fatalf("expected 200 second, got %d", artifacts[1].SizeBytes)
+	}
+	if artifacts[2].SizeBytes != 100 {
+		t.Fatalf("expected 100 third, got %d", artifacts[2].SizeBytes)
+	}
+}
+
+func TestSortBySizeDescTiebreaker(t *testing.T) {
+	artifacts := []Artifact{
+		{Path: "/b", SizeBytes: 100},
+		{Path: "/a", SizeBytes: 100},
+	}
+	SortBySizeDesc(artifacts)
+	if artifacts[0].Path != "/a" {
+		t.Fatalf("expected /a first on tie, got %s", artifacts[0].Path)
+	}
+}
+
+func TestScanVirtualEnvWithPyprojectToml(t *testing.T) {
+	root := t.TempDir()
+
+	project := filepath.Join(root, "python-proj")
+	venv := filepath.Join(project, ".venv")
+	testutil.MkdirAll(t, venv)
+	testutil.WriteFile(t, filepath.Join(venv, "pyvenv.cfg"), "home = /usr/bin")
+	testutil.WriteFile(t, filepath.Join(project, "pyproject.toml"), "[tool.poetry]")
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+	venvArtifacts := artifactsByKind(artifacts, ArtifactPythonVenv)
+	if len(venvArtifacts) != 1 {
+		t.Fatalf("expected 1 venv artifact, got %d", len(venvArtifacts))
+	}
+	if venvArtifacts[0].ProjectRoot != project {
+		t.Fatalf("expected project root %s, got %s", project, venvArtifacts[0].ProjectRoot)
+	}
+}
+
+func TestScanCMakePrefixRule(t *testing.T) {
+	root := t.TempDir()
+
+	project := filepath.Join(root, "cmake-proj")
+	testutil.MkdirAll(t, filepath.Join(project, "cmake-build-release"))
+	testutil.WriteFile(t, filepath.Join(project, "CMakeLists.txt"), "cmake_minimum_required(VERSION 3.20)")
+
+	// "cmake-build-" alone (no suffix) should not match
+	testutil.MkdirAll(t, filepath.Join(project, "cmake-build-"))
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+	for _, a := range artifacts {
+		if a.Path == filepath.Join(project, "cmake-build-") {
+			t.Fatal("cmake-build- (empty suffix) should not match prefix rule")
+		}
+	}
+}
+
+func TestHasPathSuffixEmpty(t *testing.T) {
+	if hasPathSuffix("/some/path", nil) {
+		t.Fatal("expected false for empty suffix")
+	}
+}
+
+func TestHasPathSuffixSingle(t *testing.T) {
+	if !hasPathSuffix("/some/path/bundle", []string{"bundle"}) {
+		t.Fatal("expected match for single element suffix")
+	}
+}
+
+func TestHasPathSuffixMulti(t *testing.T) {
+	if !hasPathSuffix("/some/vendor/bundle", []string{"vendor", "bundle"}) {
+		t.Fatal("expected match for multi element suffix")
+	}
+	if hasPathSuffix("/some/other/bundle", []string{"vendor", "bundle"}) {
+		t.Fatal("expected no match for wrong prefix")
+	}
+}
+
+func TestIsWithinRoot(t *testing.T) {
+	if !isWithinRoot("/a/b", "/a") {
+		t.Fatal("expected /a/b within /a")
+	}
+	if !isWithinRoot("/a", "/a") {
+		t.Fatal("expected /a within /a (self)")
+	}
+	if isWithinRoot("/b", "/a") {
+		t.Fatal("expected /b not within /a")
+	}
+}
+
+func TestSamePath(t *testing.T) {
+	if !samePath("/a/b/../b", "/a/b") {
+		t.Fatal("expected same path")
+	}
+	if samePath("/a", "/b") {
+		t.Fatal("expected different path")
+	}
+}
+
+func TestIsFile(t *testing.T) {
+	root := t.TempDir()
+	f := filepath.Join(root, "test.txt")
+	testutil.WriteFile(t, f, "hello")
+
+	if !isFile(f) {
+		t.Fatal("expected isFile to return true for file")
+	}
+	if isFile(root) {
+		t.Fatal("expected isFile to return false for directory")
+	}
+	if isFile(filepath.Join(root, "nonexistent")) {
+		t.Fatal("expected isFile to return false for nonexistent")
+	}
+}
+
+func TestPathDistance(t *testing.T) {
+	d := pathDistance("/a/b/c", "/a")
+	if d != 2 {
+		t.Fatalf("expected distance 2, got %d", d)
+	}
+
+	d = pathDistance("/a", "/a")
+	if d != 0 {
+		t.Fatalf("expected distance 0, got %d", d)
+	}
+}
+
+func TestFindNearestAncestorNoMarker(t *testing.T) {
+	root := t.TempDir()
+	nested := filepath.Join(root, "a", "b")
+	testutil.MkdirAll(t, nested)
+
+	_, ok := findNearestAncestorWithMarker(nested, root, []string{"nonexistent.marker"})
+	if ok {
+		t.Fatal("expected no match")
+	}
+}
+
+func TestFindNearestAncestorOutsideRoot(t *testing.T) {
+	_, ok := findNearestAncestorWithMarker("/outside", "/root", []string{"marker"})
+	if ok {
+		t.Fatal("expected no match outside root")
+	}
+}
+
+func TestDetectArtifactNoMatch(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "random-dir")
+	testutil.MkdirAll(t, dir)
+
+	_, ok := detectArtifact(dir, root)
+	if ok {
+		t.Fatal("expected no match for random directory")
+	}
+}
+
+func TestScanCollectsWarningsForUnreadableDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod not supported on windows")
+	}
+
+	root := t.TempDir()
+	unreadable := filepath.Join(root, "noperm")
+	testutil.MkdirAll(t, unreadable)
+
+	project := filepath.Join(root, "js")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
+
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(unreadable, 0o755) })
+
+	artifacts, warnings, err := Scan(ScanOptions{RootPath: root, MaxDepth: -1})
+	if err != nil {
+		t.Fatalf("scan should not fail: %v", err)
+	}
+	if len(warnings) == 0 {
+		t.Fatal("expected warnings for unreadable directory")
+	}
+	nodeArtifacts := artifactsByKind(artifacts, ArtifactNodeModule)
+	if len(nodeArtifacts) != 1 {
+		t.Fatalf("expected 1 node artifact despite warnings, got %d", len(nodeArtifacts))
+	}
+}
+
+func TestScanAndMeasureWithWarnings(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "js")
+	testutil.MkdirAll(t, filepath.Join(project, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
+	testutil.WriteFileSized(t, filepath.Join(project, "node_modules", "dep.js"), 50)
+
+	artifacts, _, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	if err != nil {
+		t.Fatalf("ScanAndMeasure failed: %v", err)
+	}
+	if len(artifacts) == 0 {
+		t.Fatal("expected at least 1 artifact")
+	}
+}
+
+func TestHasPathSuffixPartialMismatch(t *testing.T) {
+	if hasPathSuffix("/a", []string{"x", "y"}) {
+		t.Fatal("expected no match for short path with long suffix")
+	}
+}
+
 func mustScan(t *testing.T, opts ScanOptions) []Artifact {
 	t.Helper()
 	artifacts, _, err := Scan(opts)
@@ -407,4 +714,3 @@ func artifactAtPath(artifacts []Artifact, path string) (Artifact, bool) {
 	}
 	return Artifact{}, false
 }
-
