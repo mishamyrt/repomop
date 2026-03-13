@@ -3,12 +3,33 @@ package tui
 import (
 	"context"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
 	deleter "repomop/internal/delete"
 	"repomop/internal/scanner"
 )
+
+type keyMap struct {
+	Up     key.Binding
+	Down   key.Binding
+	Toggle key.Binding
+	Enter  key.Binding
+	Yes    key.Binding
+	No     key.Binding
+	Quit   key.Binding
+}
+
+var keys = keyMap{
+	Up:     key.NewBinding(key.WithKeys("up", "k")),
+	Down:   key.NewBinding(key.WithKeys("down", "j")),
+	Toggle: key.NewBinding(key.WithKeys(" ")),
+	Enter:  key.NewBinding(key.WithKeys("enter")),
+	Yes:    key.NewBinding(key.WithKeys("y")),
+	No:     key.NewBinding(key.WithKeys("n")),
+	Quit:   key.NewBinding(key.WithKeys("q", "esc", "ctrl+c")),
+}
 
 type viewState int
 
@@ -124,7 +145,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.state {
 		case stateLoading:
-			if keyMatches(typed, "q", "esc", "ctrl+c") {
+			if key.Matches(typed, keys.Quit) {
 				if m.cancel != nil {
 					m.cancel()
 				}
@@ -132,15 +153,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case stateList:
 			switch {
-			case keyMatches(typed, "up", "k"):
+			case key.Matches(typed, keys.Up):
 				if m.cursor > 0 {
 					m.cursor--
 				}
-			case keyMatches(typed, "down", "j"):
+			case key.Matches(typed, keys.Down):
 				if m.cursor < len(m.artifacts)-1 {
 					m.cursor++
 				}
-			case keyMatches(typed, " "):
+			case key.Matches(typed, keys.Toggle):
 				if len(m.artifacts) > 0 {
 					idx := m.cursor
 					if _, ok := m.selected[idx]; ok {
@@ -153,14 +174,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedSize += m.artifacts[idx].SizeBytes
 					}
 				}
-			case keyMatches(typed, "enter"):
+			case key.Matches(typed, keys.Enter):
 				if m.selectedCount == 0 {
 					break
 				}
 				m.cachedSelection = m.selectedArtifacts()
 				m.state = stateConfirm
 				m.message = ""
-			case keyMatches(typed, "q", "esc", "ctrl+c"):
+			case key.Matches(typed, keys.Quit):
 				if m.cancel != nil {
 					m.cancel()
 				}
@@ -168,7 +189,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case stateConfirm:
 			switch {
-			case keyMatches(typed, "y"):
+			case key.Matches(typed, keys.Yes):
 				selected := m.cachedSelection
 				if selected == nil {
 					selected = m.selectedArtifacts()
@@ -183,21 +204,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.message = ""
 				cmds = append(cmds, m.spinner.Tick)
 				cmds = append(cmds, deleteArtifactsCmd(m.ctx, selected))
-			case keyMatches(typed, "n"):
+			case key.Matches(typed, keys.No):
 				m.cachedSelection = nil
 				m.state = stateList
-			case keyMatches(typed, "q", "esc", "ctrl+c"):
+			case key.Matches(typed, keys.Quit):
 				if m.cancel != nil {
 					m.cancel()
 				}
 				return m, tea.Quit
 			}
 		case stateDeleting:
-			if keyMatches(typed, "q", "esc", "ctrl+c") {
+			if key.Matches(typed, keys.Quit) {
 				return m, nil
 			}
 		case stateDone, stateError:
-			if keyMatches(typed, "enter", "q", "esc", "ctrl+c") {
+			if key.Matches(typed, keys.Enter) || key.Matches(typed, keys.Quit) {
 				if m.cancel != nil {
 					m.cancel()
 				}
@@ -232,16 +253,6 @@ func (m Model) selectedArtifacts() []scanner.Artifact {
 	scanner.SortBySizeDesc(selected)
 
 	return selected
-}
-
-func keyMatches(msg tea.KeyMsg, keys ...string) bool {
-	pressed := msg.String()
-	for _, key := range keys {
-		if pressed == key {
-			return true
-		}
-	}
-	return false
 }
 
 func scanArtifactsCmd(ctx context.Context, opts scanner.ScanOptions) tea.Cmd {
