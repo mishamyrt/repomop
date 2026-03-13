@@ -32,7 +32,7 @@ func TestRenderListViewUsesFzfLikeMarkersAndFormat(t *testing.T) {
 		opts:            scanner.ScanOptions{RootPath: root},
 		state:           stateList,
 		artifacts:       artifacts,
-		selected:        map[int]bool{0: true},
+		selected:        map[int]struct{}{0: {}},
 		selectedCount:   1,
 		selectedSize:    2048,
 		sizeColumnWidth: computeSizeColumnWidth(artifacts),
@@ -86,7 +86,7 @@ func TestRenderListViewTruncatesPathFromLeft(t *testing.T) {
 		opts:            scanner.ScanOptions{RootPath: root},
 		state:           stateList,
 		artifacts:       artifacts,
-		selected:        map[int]bool{},
+		selected:        map[int]struct{}{},
 		sizeColumnWidth: computeSizeColumnWidth(artifacts),
 		cursor:          0,
 		width:           43,
@@ -123,7 +123,7 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 		opts:            scanner.ScanOptions{RootPath: root},
 		state:           stateList,
 		artifacts:       artifacts,
-		selected:        map[int]bool{},
+		selected:        map[int]struct{}{},
 		sizeColumnWidth: computeSizeColumnWidth(artifacts),
 		cursor:          0,
 		width:           120,
@@ -171,7 +171,7 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 	}
 
 	withSelection := base
-	withSelection.selected = map[int]bool{0: true}
+	withSelection.selected = map[int]struct{}{0: {}}
 	withSelection.selectedCount = 1
 	withSelection.selectedSize = 1024
 	outputWithSelection := stripANSI(withSelection.renderListView())
@@ -309,7 +309,7 @@ func TestViewConfirm(t *testing.T) {
 			{Kind: scanner.ArtifactNodeModule, Path: "/repo/a/node_modules", SizeBytes: 1024},
 			{Kind: scanner.ArtifactRustTarget, Path: "/repo/b/target", SizeBytes: 2048},
 		},
-		selected:      map[int]bool{0: true, 1: true},
+		selected:      map[int]struct{}{0: {}, 1: {}},
 		selectedCount: 2,
 		selectedSize:  3072,
 	}
@@ -327,14 +327,14 @@ func TestViewConfirm(t *testing.T) {
 
 func TestViewConfirmMoreThanFive(t *testing.T) {
 	arts := make([]scanner.Artifact, 7)
-	selected := make(map[int]bool)
+	selected := make(map[int]struct{})
 	for i := range arts {
 		arts[i] = scanner.Artifact{
 			Kind:      scanner.ArtifactNodeModule,
 			Path:      fmt.Sprintf("/repo/p%d/node_modules", i),
 			SizeBytes: int64((i + 1) * 100),
 		}
-		selected[i] = true
+		selected[i] = struct{}{}
 	}
 	m := Model{
 		opts:          scanner.ScanOptions{RootPath: "/repo"},
@@ -608,7 +608,7 @@ func TestRenderListViewWithWarningMessage(t *testing.T) {
 		opts:            scanner.ScanOptions{RootPath: root},
 		state:           stateList,
 		artifacts:       artifacts,
-		selected:        map[int]bool{},
+		selected:        map[int]struct{}{},
 		sizeColumnWidth: computeSizeColumnWidth(artifacts),
 		cursor:          0,
 		width:           120,

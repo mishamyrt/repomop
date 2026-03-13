@@ -20,8 +20,5 @@ func Bytes(value int64) string {
 		unit++
 	}
 
-	if unit == 0 {
-		return fmt.Sprintf("%d %s", value, byteUnits[unit])
-	}
 	return fmt.Sprintf("%.1f %s", size, byteUnits[unit])
 }

@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -97,13 +98,13 @@ func (m Model) renderArtifactLine(idx int, sizeWidth int) string {
 
 	marker := "○"
 	markerRenderer := idleMarkerStyle
-	if m.selected[idx] {
+	if _, ok := m.selected[idx]; ok {
 		marker = "●"
 		markerRenderer = selectedMarkerStyle
 	}
 
 	path := pathutil.RelativePathOrSelf(m.opts.RootPath, artifact.Path)
-	pathWidth := m.pathColumnWidth(sizeWidth, string(artifact.Kind), focused)
+	pathWidth := m.pathColumnWidth(sizeWidth, artifact.Kind.String(), focused)
 	pathTextRaw := truncatePathLeft(path, pathWidth)
 
 	barTextRaw := "  "
@@ -127,14 +128,17 @@ func (m Model) renderArtifactLine(idx int, sizeWidth int) string {
 	barText := barRenderer.Render(barTextRaw)
 	sizeText := sizeRenderer.Width(sizeWidth).Align(lipgloss.Right).Render(format.Bytes(artifact.SizeBytes))
 	pathText := pathRenderer.Render(pathTextRaw)
-	kindText := kindRenderer.Render(string(artifact.Kind))
+	kindText := kindRenderer.Render(artifact.Kind.String())
 	markerText := markerRenderer.Render(marker)
 
 	return barText + markerText + separator + sizeText + separator + pathText + separator + kindText
 }
 
 func (m Model) renderConfirmView() string {
-	selected := m.selectedArtifacts()
+	selected := m.cachedSelection
+	if selected == nil {
+		selected = m.selectedArtifacts()
+	}
 	sum := int64(0)
 	for _, artifact := range selected {
 		sum += artifact.SizeBytes
@@ -365,9 +369,7 @@ func truncatePathLeft(path string, maxWidth int) string {
 		return ellipsis
 	}
 
-	for left, right := 0, len(suffixParts)-1; left < right; left, right = left+1, right-1 {
-		suffixParts[left], suffixParts[right] = suffixParts[right], suffixParts[left]
-	}
+	slices.Reverse(suffixParts)
 	return prefix + strings.Join(suffixParts, separator)
 }
 
@@ -391,9 +393,7 @@ func tailByWidth(value string, maxWidth int) string {
 		width += runeWidth
 	}
 
-	for left, right := 0, len(tail)-1; left < right; left, right = left+1, right-1 {
-		tail[left], tail[right] = tail[right], tail[left]
-	}
+	slices.Reverse(tail)
 	return string(tail)
 }
 

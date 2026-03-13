@@ -1,6 +1,7 @@
 package size
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,7 +22,7 @@ func TestDirectoriesCalculatesNestedSize(t *testing.T) {
 	testutil.WriteFileSized(t, filepath.Join(dirA, "nested", "f2.bin"), 15)
 	testutil.WriteFileSized(t, filepath.Join(dirB, "f3.bin"), 8)
 
-	sizes, errs := Directories([]string{dirA, dirB}, 2)
+	sizes, errs := Directories(context.Background(), []string{dirA, dirB}, 2)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -54,7 +55,7 @@ func TestDirectoriesExcludesHardLinkedFiles(t *testing.T) {
 		t.Fatalf("hard link: %v", err)
 	}
 
-	sizes, errs := Directories([]string{dir}, 1)
+	sizes, errs := Directories(context.Background(), []string{dir}, 1)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -72,7 +73,7 @@ func TestDirectoriesCountsAllWhenNoHardLinks(t *testing.T) {
 	testutil.WriteFileSized(t, filepath.Join(dir, "a.bin"), 30)
 	testutil.WriteFileSized(t, filepath.Join(dir, "b.bin"), 70)
 
-	sizes, errs := Directories([]string{dir}, 1)
+	sizes, errs := Directories(context.Background(), []string{dir}, 1)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -83,7 +84,7 @@ func TestDirectoriesCountsAllWhenNoHardLinks(t *testing.T) {
 }
 
 func TestDirectoriesEmptyPaths(t *testing.T) {
-	sizes, errs := Directories([]string{}, 1)
+	sizes, errs := Directories(context.Background(), []string{}, 1)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -98,7 +99,7 @@ func TestDirectoriesWorkersClampedToOne(t *testing.T) {
 	testutil.MkdirAll(t, dir)
 	testutil.WriteFileSized(t, filepath.Join(dir, "f.bin"), 42)
 
-	sizes, errs := Directories([]string{dir}, 0)
+	sizes, errs := Directories(context.Background(), []string{dir}, 0)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -124,14 +125,14 @@ func TestDirectoriesSkipsSymlinks(t *testing.T) {
 
 	testutil.WriteFileSized(t, filepath.Join(dir, "real.bin"), 50)
 
-	sizes, _ := Directories([]string{dir}, 1)
+	sizes, _ := Directories(context.Background(), []string{dir}, 1)
 	if sizes[dir] != 50 {
 		t.Fatalf("expected 50 (symlink excluded), got %d", sizes[dir])
 	}
 }
 
 func TestDirectoriesNonexistentPath(t *testing.T) {
-	sizes, _ := Directories([]string{"/nonexistent/path/xyz"}, 1)
+	sizes, _ := Directories(context.Background(), []string{"/nonexistent/path/xyz"}, 1)
 	if sizes["/nonexistent/path/xyz"] != 0 {
 		t.Fatalf("expected 0 for nonexistent path, got %d", sizes["/nonexistent/path/xyz"])
 	}
@@ -152,7 +153,7 @@ func TestDirectoriesEmptyDirectory(t *testing.T) {
 	dir := filepath.Join(root, "empty")
 	testutil.MkdirAll(t, dir)
 
-	sizes, errs := Directories([]string{dir}, 1)
+	sizes, errs := Directories(context.Background(), []string{dir}, 1)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
@@ -180,7 +181,7 @@ func TestDirectorySizeWithUnreadableSubdir(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(unreadable, 0o755) })
 
-	sizes, warnings := Directories([]string{dir}, 1)
+	sizes, warnings := Directories(context.Background(), []string{dir}, 1)
 	if len(warnings) == 0 {
 		t.Fatal("expected warnings for unreadable subdir")
 	}
@@ -199,7 +200,7 @@ func TestDirectoriesMultipleWorkers(t *testing.T) {
 		dirs[i] = d
 	}
 
-	sizes, errs := Directories(dirs, 4)
+	sizes, errs := Directories(context.Background(), dirs, 4)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}

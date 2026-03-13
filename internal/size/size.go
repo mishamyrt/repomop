@@ -1,6 +1,7 @@
 package size
 
 import (
+	"context"
 	"io/fs"
 	"path/filepath"
 	"runtime"
@@ -26,7 +27,9 @@ func RecommendedWorkerCount() int {
 }
 
 // Directories calculates recursive sizes for each directory path.
-func Directories(paths []string, workers int) (map[string]int64, []error) {
+// It stops dispatching new jobs if ctx is cancelled, but waits for
+// already-running jobs to finish before returning.
+func Directories(ctx context.Context, paths []string, workers int) (map[string]int64, []error) {
 	if workers < 1 {
 		workers = 1
 	}
@@ -53,7 +56,11 @@ func Directories(paths []string, workers int) (map[string]int64, []error) {
 
 	go func() {
 		for _, path := range paths {
-			jobs <- path
+			select {
+			case <-ctx.Done():
+				break
+			case jobs <- path:
+			}
 		}
 		close(jobs)
 		wg.Wait()

@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"os"
 
 	"repomop/internal/scanner"
@@ -20,13 +21,16 @@ type Result struct {
 }
 
 // Artifacts removes selected artifact directories using os.RemoveAll.
-func Artifacts(artifacts []scanner.Artifact) Result {
+// It stops processing further artifacts if ctx is cancelled.
+func Artifacts(ctx context.Context, artifacts []scanner.Artifact) Result {
 	result := Result{
 		Deleted: make([]scanner.Artifact, 0, len(artifacts)),
-		Errors:  make([]Error, 0),
 	}
 
 	for _, artifact := range artifacts {
+		if ctx.Err() != nil {
+			break
+		}
 		if err := os.RemoveAll(artifact.Path); err != nil {
 			result.Errors = append(result.Errors, Error{Artifact: artifact, Err: err})
 			continue

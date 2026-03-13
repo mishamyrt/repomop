@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -61,7 +62,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if opts.dryRun || opts.yes {
-		artifacts, warnings, err := scanner.ScanAndMeasure(scanOpts)
+		ctx := context.Background()
+		artifacts, warnings, err := scanner.ScanAndMeasure(ctx, scanOpts)
 		if err != nil {
 			fmt.Fprintf(stderr, "scan failed: %v\n", err)
 			return 1
@@ -72,7 +74,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 0
 		}
 
-		result := delete.Artifacts(artifacts)
+		result := delete.Artifacts(ctx, artifacts)
 		printDeleteSummary(stdout, rootPath, artifacts, warnings, result)
 		if len(result.Errors) > 0 {
 			return 1

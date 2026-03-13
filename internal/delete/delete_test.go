@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,7 +25,7 @@ func TestArtifactsDeletesSelectedDirectories(t *testing.T) {
 		{Kind: scanner.ArtifactNodeModule, Path: one, ProjectRoot: root, SizeBytes: 10},
 	}
 
-	result := Artifacts(selected)
+	result := Artifacts(context.Background(), selected)
 	if len(result.Deleted) != 1 {
 		t.Fatalf("expected 1 deleted artifact, got %d", len(result.Deleted))
 	}
@@ -58,7 +59,7 @@ func TestArtifactsDeletesMultiple(t *testing.T) {
 		{Kind: scanner.ArtifactNodeModule, Path: two, ProjectRoot: root, SizeBytes: 20},
 	}
 
-	result := Artifacts(selected)
+	result := Artifacts(context.Background(), selected)
 	if len(result.Deleted) != 2 {
 		t.Fatalf("expected 2 deleted artifacts, got %d", len(result.Deleted))
 	}
@@ -71,7 +72,7 @@ func TestArtifactsDeletesMultiple(t *testing.T) {
 }
 
 func TestArtifactsEmptySlice(t *testing.T) {
-	result := Artifacts([]scanner.Artifact{})
+	result := Artifacts(context.Background(), []scanner.Artifact{})
 	if len(result.Deleted) != 0 {
 		t.Fatalf("expected 0 deleted, got %d", len(result.Deleted))
 	}
@@ -85,7 +86,7 @@ func TestArtifactsCollectsErrorsForNonexistentPath(t *testing.T) {
 		{Kind: scanner.ArtifactNodeModule, Path: "/nonexistent/path/that/does/not/exist", SizeBytes: 100},
 	}
 
-	result := Artifacts(selected)
+	result := Artifacts(context.Background(), selected)
 
 	// os.RemoveAll does not error on nonexistent paths, so it should be "deleted"
 	if len(result.Deleted) != 1 {
@@ -114,7 +115,7 @@ func TestArtifactsCollectsRemovalErrors(t *testing.T) {
 		{Kind: scanner.ArtifactNodeModule, Path: child, ProjectRoot: root, SizeBytes: 10},
 	}
 
-	result := Artifacts(selected)
+	result := Artifacts(context.Background(), selected)
 	if len(result.Errors) != 1 {
 		t.Fatalf("expected 1 error, got %d errors and %d deleted", len(result.Errors), len(result.Deleted))
 	}
