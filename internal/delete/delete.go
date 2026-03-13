@@ -25,6 +25,7 @@ type Result struct {
 func Artifacts(ctx context.Context, artifacts []scanner.Artifact) Result {
 	result := Result{
 		Deleted: make([]scanner.Artifact, 0, len(artifacts)),
+		Errors:  nil,
 	}
 
 	for _, artifact := range artifacts {

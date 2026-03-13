@@ -40,12 +40,12 @@ type Model struct {
 	state   viewState
 	spinner spinner.Model
 
-	artifacts        []scanner.Artifact
-	selected         map[int]struct{}
-	cachedSelection  []scanner.Artifact
-	cursor           int
-	scanWarnings     []error
-	deleteResult     deleter.Result
+	artifacts       []scanner.Artifact
+	selected        map[int]struct{}
+	cachedSelection []scanner.Artifact
+	cursor          int
+	scanWarnings    []error
+	deleteResult    deleter.Result
 
 	selectedCount   int
 	selectedSize    int64
@@ -125,7 +125,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.state {
 		case stateLoading:
 			if keyMatches(typed, "q", "esc", "ctrl+c") {
-				if m.cancel != nil { m.cancel() }
+				if m.cancel != nil {
+					m.cancel()
+				}
 				return m, tea.Quit
 			}
 		case stateList:
@@ -134,32 +136,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor > 0 {
 					m.cursor--
 				}
-		case keyMatches(typed, "down", "j"):
-			if m.cursor < len(m.artifacts)-1 {
-				m.cursor++
-			}
-		case keyMatches(typed, " "):
-			if len(m.artifacts) > 0 {
-				idx := m.cursor
-				if _, ok := m.selected[idx]; ok {
-					delete(m.selected, idx)
-					m.selectedCount--
-					m.selectedSize -= m.artifacts[idx].SizeBytes
-				} else {
-					m.selected[idx] = struct{}{}
-					m.selectedCount++
-					m.selectedSize += m.artifacts[idx].SizeBytes
+			case keyMatches(typed, "down", "j"):
+				if m.cursor < len(m.artifacts)-1 {
+					m.cursor++
 				}
-			}
-		case keyMatches(typed, "enter"):
-			if m.selectedCount == 0 {
-				break
-			}
-			m.cachedSelection = m.selectedArtifacts()
-			m.state = stateConfirm
-			m.message = ""
-		case keyMatches(typed, "q", "esc", "ctrl+c"):
-				if m.cancel != nil { m.cancel() }
+			case keyMatches(typed, " "):
+				if len(m.artifacts) > 0 {
+					idx := m.cursor
+					if _, ok := m.selected[idx]; ok {
+						delete(m.selected, idx)
+						m.selectedCount--
+						m.selectedSize -= m.artifacts[idx].SizeBytes
+					} else {
+						m.selected[idx] = struct{}{}
+						m.selectedCount++
+						m.selectedSize += m.artifacts[idx].SizeBytes
+					}
+				}
+			case keyMatches(typed, "enter"):
+				if m.selectedCount == 0 {
+					break
+				}
+				m.cachedSelection = m.selectedArtifacts()
+				m.state = stateConfirm
+				m.message = ""
+			case keyMatches(typed, "q", "esc", "ctrl+c"):
+				if m.cancel != nil {
+					m.cancel()
+				}
 				return m, tea.Quit
 			}
 		case stateConfirm:
@@ -183,7 +187,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cachedSelection = nil
 				m.state = stateList
 			case keyMatches(typed, "q", "esc", "ctrl+c"):
-				if m.cancel != nil { m.cancel() }
+				if m.cancel != nil {
+					m.cancel()
+				}
 				return m, tea.Quit
 			}
 		case stateDeleting:
@@ -192,7 +198,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case stateDone, stateError:
 			if keyMatches(typed, "enter", "q", "esc", "ctrl+c") {
-				if m.cancel != nil { m.cancel() }
+				if m.cancel != nil {
+					m.cancel()
+				}
 				return m, tea.Quit
 			}
 		}
