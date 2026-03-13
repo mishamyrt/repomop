@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 	"repomop/internal/testutil"
 )
 
-func newTestModel(state viewState, artifacts []scanner.Artifact, selected map[int]bool) Model {
+func newTestModel(state viewState, artifacts []scanner.Artifact, selected map[int]struct{}) Model {
 	m := Model{
 		state:           state,
 		artifacts:       artifacts,
@@ -22,7 +23,7 @@ func newTestModel(state viewState, artifacts []scanner.Artifact, selected map[in
 		height:          30,
 	}
 	if selected == nil {
-		m.selected = map[int]bool{}
+		m.selected = map[int]struct{}{}
 		m.selectedCount = 0
 	}
 	var sz int64
@@ -73,7 +74,7 @@ func TestLoadingCtrlCQuits(t *testing.T) {
 // --- List state ---
 
 func TestListViewEscQuits(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd == nil {
 		t.Fatal("expected quit command on esc key")
@@ -84,7 +85,7 @@ func TestListViewEscQuits(t *testing.T) {
 }
 
 func TestConfirmViewEscQuits(t *testing.T) {
-	m := newTestModel(stateConfirm, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd == nil {
 		t.Fatal("expected quit command on esc key")
@@ -95,7 +96,7 @@ func TestConfirmViewEscQuits(t *testing.T) {
 }
 
 func TestListViewEnterWithoutSelectionDoesNotSetHint(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.message = "Some artifact sizes could not be fully calculated."
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -109,7 +110,7 @@ func TestListViewEnterWithoutSelectionDoesNotSetHint(t *testing.T) {
 }
 
 func TestListViewCursorUp(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 2
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	got := updated.(Model)
@@ -119,7 +120,7 @@ func TestListViewCursorUp(t *testing.T) {
 }
 
 func TestListViewCursorUpAtZero(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	got := updated.(Model)
@@ -129,7 +130,7 @@ func TestListViewCursorUpAtZero(t *testing.T) {
 }
 
 func TestListViewCursorDown(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	got := updated.(Model)
@@ -139,7 +140,7 @@ func TestListViewCursorDown(t *testing.T) {
 }
 
 func TestListViewCursorDownAtEnd(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = len(sampleArtifacts) - 1
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	got := updated.(Model)
@@ -149,7 +150,7 @@ func TestListViewCursorDownAtEnd(t *testing.T) {
 }
 
 func TestListViewCursorK(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 1
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	got := updated.(Model)
@@ -159,7 +160,7 @@ func TestListViewCursorK(t *testing.T) {
 }
 
 func TestListViewCursorJ(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	got := updated.(Model)
@@ -169,12 +170,12 @@ func TestListViewCursorJ(t *testing.T) {
 }
 
 func TestListViewSpaceTogglesSelection(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got := updated.(Model)
-	if !got.selected[1] {
+	if _, ok := got.selected[1]; !ok {
 		t.Fatal("expected item 1 to be selected")
 	}
 	if got.selectedCount != 1 {
@@ -186,7 +187,7 @@ func TestListViewSpaceTogglesSelection(t *testing.T) {
 
 	updated2, _ := got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got2 := updated2.(Model)
-	if got2.selected[1] {
+	if _, ok := got2.selected[1]; ok {
 		t.Fatal("expected item 1 to be deselected")
 	}
 	if got2.selectedCount != 0 {
@@ -198,7 +199,7 @@ func TestListViewSpaceTogglesSelection(t *testing.T) {
 }
 
 func TestListViewEnterWithSelectionGoesToConfirm(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{0: {}})
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := updated.(Model)
@@ -208,7 +209,7 @@ func TestListViewEnterWithSelectionGoesToConfirm(t *testing.T) {
 }
 
 func TestListViewQQuits(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if cmd == nil {
 		t.Fatal("expected quit command")
@@ -218,7 +219,7 @@ func TestListViewQQuits(t *testing.T) {
 // --- Confirm state ---
 
 func TestConfirmYProceeds(t *testing.T) {
-	m := newTestModel(stateConfirm, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	got := updated.(Model)
@@ -231,7 +232,7 @@ func TestConfirmYProceeds(t *testing.T) {
 }
 
 func TestConfirmNReturnsToList(t *testing.T) {
-	m := newTestModel(stateConfirm, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	got := updated.(Model)
@@ -241,7 +242,7 @@ func TestConfirmNReturnsToList(t *testing.T) {
 }
 
 func TestConfirmCtrlCQuits(t *testing.T) {
-	m := newTestModel(stateConfirm, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Fatal("expected quit command")
@@ -251,7 +252,7 @@ func TestConfirmCtrlCQuits(t *testing.T) {
 // --- Deleting state ---
 
 func TestDeletingIgnoresNonQuitKeys(t *testing.T) {
-	m := newTestModel(stateDeleting, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	got := updated.(Model)
 	if got.state != stateDeleting {
@@ -261,7 +262,7 @@ func TestDeletingIgnoresNonQuitKeys(t *testing.T) {
 }
 
 func TestDeletingEscDoesNotQuit(t *testing.T) {
-	m := newTestModel(stateDeleting, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd != nil {
 		if _, ok := cmd().(tea.QuitMsg); ok {
@@ -357,7 +358,7 @@ func TestScanFinishedWithWarnings(t *testing.T) {
 // --- deleteFinishedMsg ---
 
 func TestDeleteFinishedSuccess(t *testing.T) {
-	m := newTestModel(stateDeleting, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
 	updated, _ := m.Update(deleteFinishedMsg{result: deleter.Result{
 		Deleted:    []scanner.Artifact{sampleArtifacts[0]},
 		Errors:     []deleter.Error{},
@@ -373,7 +374,7 @@ func TestDeleteFinishedSuccess(t *testing.T) {
 }
 
 func TestDeleteFinishedWithErrors(t *testing.T) {
-	m := newTestModel(stateDeleting, sampleArtifacts, map[int]bool{0: true})
+	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
 	updated, _ := m.Update(deleteFinishedMsg{result: deleter.Result{
 		Deleted: []scanner.Artifact{},
 		Errors: []deleter.Error{
@@ -392,7 +393,7 @@ func TestDeleteFinishedWithErrors(t *testing.T) {
 // --- WindowSizeMsg ---
 
 func TestWindowSizeMsg(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 50})
 	got := updated.(Model)
 	if got.width != 200 || got.height != 50 {
@@ -435,7 +436,7 @@ func TestDeleteResult(t *testing.T) {
 // --- selectedArtifacts ---
 
 func TestSelectedArtifactsSort(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{0: true, 2: true})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{0: {}, 2: {}})
 	selected := m.selectedArtifacts()
 	if len(selected) != 2 {
 		t.Fatalf("expected 2, got %d", len(selected))
@@ -446,7 +447,7 @@ func TestSelectedArtifactsSort(t *testing.T) {
 }
 
 func TestSelectedArtifactsEmpty(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	selected := m.selectedArtifacts()
 	if selected != nil {
 		t.Fatalf("expected nil, got %v", selected)
@@ -456,7 +457,7 @@ func TestSelectedArtifactsEmpty(t *testing.T) {
 // --- Confirm with empty selected (edge case) ---
 
 func TestConfirmYWithEmptySelectedReturnsToList(t *testing.T) {
-	m := newTestModel(stateConfirm, sampleArtifacts, map[int]bool{})
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{})
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	got := updated.(Model)
@@ -478,7 +479,7 @@ func TestInitReturnsCmd(t *testing.T) {
 // --- selectedArtifacts with out-of-bounds index ---
 
 func TestSelectedArtifactsSkipsOutOfBounds(t *testing.T) {
-	m := newTestModel(stateList, sampleArtifacts, map[int]bool{0: true, 99: true, -1: true})
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{0: {}, 99: {}, -1: {}})
 	selected := m.selectedArtifacts()
 	if len(selected) != 1 {
 		t.Fatalf("expected 1 valid selection, got %d", len(selected))
@@ -494,7 +495,7 @@ func TestScanArtifactsCmdSuccess(t *testing.T) {
 	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
 	testutil.WriteFileSized(t, filepath.Join(project, "node_modules", "x.js"), 10)
 
-	cmd := scanArtifactsCmd(scanner.ScanOptions{RootPath: root, MaxDepth: -1})
+	cmd := scanArtifactsCmd(context.Background(), scanner.ScanOptions{RootPath: root, MaxDepth: -1})
 	msg := cmd()
 	result, ok := msg.(scanFinishedMsg)
 	if !ok {
@@ -509,7 +510,7 @@ func TestScanArtifactsCmdSuccess(t *testing.T) {
 }
 
 func TestScanArtifactsCmdError(t *testing.T) {
-	cmd := scanArtifactsCmd(scanner.ScanOptions{RootPath: "", MaxDepth: -1})
+	cmd := scanArtifactsCmd(context.Background(), scanner.ScanOptions{RootPath: "", MaxDepth: -1})
 	msg := cmd()
 	result, ok := msg.(scanFinishedMsg)
 	if !ok {
@@ -529,7 +530,7 @@ func TestDeleteArtifactsCmdSuccess(t *testing.T) {
 	artifacts := []scanner.Artifact{
 		{Kind: scanner.ArtifactNodeModule, Path: dir, ProjectRoot: root, SizeBytes: 10},
 	}
-	cmd := deleteArtifactsCmd(artifacts)
+	cmd := deleteArtifactsCmd(context.Background(), artifacts)
 	msg := cmd()
 	result, ok := msg.(deleteFinishedMsg)
 	if !ok {

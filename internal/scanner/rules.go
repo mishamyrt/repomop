@@ -6,23 +6,52 @@ import (
 	"strings"
 )
 
-func detectArtifact(path string, root string) (Artifact, bool) {
+// scanContext holds per-scan state shared across detectArtifact calls:
+// a rule index for O(1) name-based lookup and a stat cache to avoid
+// repeated os.Stat calls for the same marker files.
+type scanContext struct {
+	root            string
+	fileExistsCache map[string]bool
+	ruleIndex       map[string][]artifactRule
+	specialRules    []artifactRule
+}
+
+func newScanContext(root string) *scanContext {
+	idx := make(map[string][]artifactRule)
+	var special []artifactRule
+	for _, rule := range defaultArtifactRules {
+		if rule.dirName != "" {
+			idx[rule.dirName] = append(idx[rule.dirName], rule)
+		} else {
+			special = append(special, rule)
+		}
+	}
+	return &scanContext{
+		root:            root,
+		fileExistsCache: make(map[string]bool, 256),
+		ruleIndex:       idx,
+		specialRules:    special,
+	}
+}
+
+func detectArtifact(ctx *scanContext, path string) (Artifact, bool) {
 	var (
 		matched      bool
 		bestArtifact Artifact
 		bestDistance int
 	)
 
-	for _, rule := range defaultArtifactRules {
-		if !rule.match(path) {
-			continue
-		}
+	base := filepath.Base(path)
+	candidates := ctx.ruleIndex[base]
 
-		match, ok := rule.resolveProjectRoot(path, root)
+	runRule := func(rule artifactRule) {
+		if !rule.match(ctx, path) {
+			return
+		}
+		match, ok := rule.resolveProjectRoot(ctx, path)
 		if !ok {
-			continue
+			return
 		}
-
 		if !matched || match.distance < bestDistance {
 			matched = true
 			bestDistance = match.distance
@@ -34,6 +63,13 @@ func detectArtifact(path string, root string) (Artifact, bool) {
 		}
 	}
 
+	for _, rule := range candidates {
+		runRule(rule)
+	}
+	for _, rule := range ctx.specialRules {
+		runRule(rule)
+	}
+
 	if matched {
 		return bestArtifact, true
 	}
@@ -41,42 +77,41 @@ func detectArtifact(path string, root string) (Artifact, bool) {
 	return Artifact{}, false
 }
 
-func isVirtualEnv(path string) bool {
-	if isFile(filepath.Join(path, "pyvenv.cfg")) {
+func isVirtualEnv(ctx *scanContext, path string) bool {
+	if cachedIsFile(ctx, filepath.Join(path, "pyvenv.cfg")) {
 		return true
 	}
-
 	activatePath := filepath.Join(path, "bin", "activate")
 	pythonPath := filepath.Join(path, "bin", "python")
-	return isFile(activatePath) && isFile(pythonPath)
+	return cachedIsFile(ctx, activatePath) && cachedIsFile(ctx, pythonPath)
 }
 
-func inferVenvProjectRoot(venvPath string, root string) string {
+func inferVenvProjectRoot(ctx *scanContext, venvPath string) string {
 	markers := []string{"pyproject.toml", "requirements.txt", "setup.py", "Pipfile"}
-	if projectRoot, ok := findNearestAncestorWithMarker(filepath.Dir(venvPath), root, markers); ok {
+	if projectRoot, ok := findNearestAncestorWithMarker(ctx, filepath.Dir(venvPath), markers); ok {
 		return projectRoot
 	}
 	return filepath.Dir(venvPath)
 }
 
-func findNearestAncestorWithMarker(start string, root string, markers []string) (string, bool) {
+func findNearestAncestorWithMarker(ctx *scanContext, start string, markers []string) (string, bool) {
 	curr := filepath.Clean(start)
-	root = filepath.Clean(root)
+	root := ctx.root
 
 	for {
 		if !isWithinRoot(curr, root) {
 			return "", false
 		}
 		for _, marker := range markers {
-			if isFile(filepath.Join(curr, marker)) {
+			if cachedIsFile(ctx, filepath.Join(curr, marker)) {
 				return curr, true
 			}
 		}
-		if samePath(curr, root) {
+		if curr == root {
 			return "", false
 		}
 		parent := filepath.Dir(curr)
-		if samePath(parent, curr) {
+		if parent == curr {
 			return "", false
 		}
 		curr = parent
@@ -88,7 +123,17 @@ func isWithinRoot(path string, root string) bool {
 	if err != nil {
 		return false
 	}
-	return rel == "." || (rel != "" && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "..")
+	return !strings.HasPrefix(rel, "..")
+}
+
+func cachedIsFile(ctx *scanContext, path string) bool {
+	if v, ok := ctx.fileExistsCache[path]; ok {
+		return v
+	}
+	info, err := os.Stat(path)
+	result := err == nil && !info.IsDir()
+	ctx.fileExistsCache[path] = result
+	return result
 }
 
 func samePath(a string, b string) bool {

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"context"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -31,16 +33,19 @@ type deleteFinishedMsg struct {
 
 // Model is the Bubble Tea application state.
 type Model struct {
-	opts scanner.ScanOptions
+	opts   scanner.ScanOptions
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	state   viewState
 	spinner spinner.Model
 
-	artifacts    []scanner.Artifact
-	selected     map[int]bool
-	cursor       int
-	scanWarnings []error
-	deleteResult deleter.Result
+	artifacts        []scanner.Artifact
+	selected         map[int]struct{}
+	cachedSelection  []scanner.Artifact
+	cursor           int
+	scanWarnings     []error
+	deleteResult     deleter.Result
 
 	selectedCount   int
 	selectedSize    int64
@@ -57,19 +62,22 @@ type Model struct {
 func NewModel(opts scanner.ScanOptions) Model {
 	spin := spinner.New()
 	spin.Spinner = spinner.Dot
+	ctx, cancel := context.WithCancel(context.Background())
 
 	return Model{
 		opts:      opts,
+		ctx:       ctx,
+		cancel:    cancel,
 		state:     stateLoading,
 		spinner:   spin,
-		selected:  make(map[int]bool),
+		selected:  make(map[int]struct{}),
 		artifacts: make([]scanner.Artifact, 0),
 	}
 }
 
 // Init starts spinner ticks and asynchronous scanning.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, scanArtifactsCmd(m.opts))
+	return tea.Batch(m.spinner.Tick, scanArtifactsCmd(m.ctx, m.opts))
 }
 
 // Update handles keyboard input and async scan/delete messages.
@@ -89,7 +97,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.artifacts = typed.artifacts
 		m.scanWarnings = typed.warnings
-		m.selected = make(map[int]bool, len(typed.artifacts))
+		m.selected = make(map[int]struct{}, len(typed.artifacts))
 		m.cursor = 0
 		m.selectedCount = 0
 		m.selectedSize = 0
@@ -117,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.state {
 		case stateLoading:
 			if keyMatches(typed, "q", "esc", "ctrl+c") {
+				if m.cancel != nil { m.cancel() }
 				return m, tea.Quit
 			}
 		case stateList:
@@ -125,47 +134,56 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor > 0 {
 					m.cursor--
 				}
-			case keyMatches(typed, "down", "j"):
-				if m.cursor < len(m.artifacts)-1 {
-					m.cursor++
-				}
+		case keyMatches(typed, "down", "j"):
+			if m.cursor < len(m.artifacts)-1 {
+				m.cursor++
+			}
 		case keyMatches(typed, " "):
 			if len(m.artifacts) > 0 {
 				idx := m.cursor
-				if m.selected[idx] {
+				if _, ok := m.selected[idx]; ok {
 					delete(m.selected, idx)
 					m.selectedCount--
 					m.selectedSize -= m.artifacts[idx].SizeBytes
 				} else {
-					m.selected[idx] = true
+					m.selected[idx] = struct{}{}
 					m.selectedCount++
 					m.selectedSize += m.artifacts[idx].SizeBytes
 				}
 			}
 		case keyMatches(typed, "enter"):
 			if m.selectedCount == 0 {
-					break
-				}
-				m.state = stateConfirm
-				m.message = ""
-			case keyMatches(typed, "q", "esc", "ctrl+c"):
+				break
+			}
+			m.cachedSelection = m.selectedArtifacts()
+			m.state = stateConfirm
+			m.message = ""
+		case keyMatches(typed, "q", "esc", "ctrl+c"):
+				if m.cancel != nil { m.cancel() }
 				return m, tea.Quit
 			}
 		case stateConfirm:
 			switch {
 			case keyMatches(typed, "y"):
-				selected := m.selectedArtifacts()
+				selected := m.cachedSelection
+				if selected == nil {
+					selected = m.selectedArtifacts()
+				}
 				if len(selected) == 0 {
+					m.cachedSelection = nil
 					m.state = stateList
 					break
 				}
+				m.cachedSelection = nil
 				m.state = stateDeleting
 				m.message = ""
 				cmds = append(cmds, m.spinner.Tick)
-				cmds = append(cmds, deleteArtifactsCmd(selected))
+				cmds = append(cmds, deleteArtifactsCmd(m.ctx, selected))
 			case keyMatches(typed, "n"):
+				m.cachedSelection = nil
 				m.state = stateList
 			case keyMatches(typed, "q", "esc", "ctrl+c"):
+				if m.cancel != nil { m.cancel() }
 				return m, tea.Quit
 			}
 		case stateDeleting:
@@ -174,6 +192,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case stateDone, stateError:
 			if keyMatches(typed, "enter", "q", "esc", "ctrl+c") {
+				if m.cancel != nil { m.cancel() }
 				return m, tea.Quit
 			}
 		}
@@ -217,9 +236,9 @@ func keyMatches(msg tea.KeyMsg, keys ...string) bool {
 	return false
 }
 
-func scanArtifactsCmd(opts scanner.ScanOptions) tea.Cmd {
+func scanArtifactsCmd(ctx context.Context, opts scanner.ScanOptions) tea.Cmd {
 	return func() tea.Msg {
-		artifacts, warnings, err := scanner.ScanAndMeasure(opts)
+		artifacts, warnings, err := scanner.ScanAndMeasure(ctx, opts)
 		if err != nil {
 			return scanFinishedMsg{err: err}
 		}
@@ -227,9 +246,9 @@ func scanArtifactsCmd(opts scanner.ScanOptions) tea.Cmd {
 	}
 }
 
-func deleteArtifactsCmd(artifacts []scanner.Artifact) tea.Cmd {
+func deleteArtifactsCmd(ctx context.Context, artifacts []scanner.Artifact) tea.Cmd {
 	return func() tea.Msg {
-		result := deleter.Artifacts(artifacts)
+		result := deleter.Artifacts(ctx, artifacts)
 		return deleteFinishedMsg{result: result}
 	}
 }

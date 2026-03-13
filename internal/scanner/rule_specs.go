@@ -12,8 +12,9 @@ type ruleMatch struct {
 
 type artifactRule struct {
 	kind               ArtifactKind
-	match              func(path string) bool
-	resolveProjectRoot func(path string, root string) (ruleMatch, bool)
+	dirName            string
+	match              func(ctx *scanContext, path string) bool
+	resolveProjectRoot func(ctx *scanContext, path string) (ruleMatch, bool)
 }
 
 var gradleMarkers = []string{"settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"}
@@ -48,12 +49,13 @@ var defaultArtifactRules = []artifactRule{
 
 func namedDirRule(kind ArtifactKind, dirName string, projectMarkers []string) artifactRule {
 	return artifactRule{
-		kind: kind,
-		match: func(path string) bool {
+		kind:    kind,
+		dirName: dirName,
+		match: func(_ *scanContext, path string) bool {
 			return filepath.Base(path) == dirName
 		},
-		resolveProjectRoot: func(path string, root string) (ruleMatch, bool) {
-			return markerMatch(path, root, projectMarkers)
+		resolveProjectRoot: func(ctx *scanContext, path string) (ruleMatch, bool) {
+			return markerMatch(ctx, path, projectMarkers)
 		},
 	}
 }
@@ -61,12 +63,12 @@ func namedDirRule(kind ArtifactKind, dirName string, projectMarkers []string) ar
 func prefixDirRule(kind ArtifactKind, prefix string, projectMarkers []string) artifactRule {
 	return artifactRule{
 		kind: kind,
-		match: func(path string) bool {
+		match: func(_ *scanContext, path string) bool {
 			base := filepath.Base(path)
 			return strings.HasPrefix(base, prefix) && len(base) > len(prefix)
 		},
-		resolveProjectRoot: func(path string, root string) (ruleMatch, bool) {
-			return markerMatch(path, root, projectMarkers)
+		resolveProjectRoot: func(ctx *scanContext, path string) (ruleMatch, bool) {
+			return markerMatch(ctx, path, projectMarkers)
 		},
 	}
 }
@@ -74,11 +76,11 @@ func prefixDirRule(kind ArtifactKind, prefix string, projectMarkers []string) ar
 func pathSuffixRule(kind ArtifactKind, suffix []string, projectMarkers []string) artifactRule {
 	return artifactRule{
 		kind: kind,
-		match: func(path string) bool {
+		match: func(_ *scanContext, path string) bool {
 			return hasPathSuffix(path, suffix)
 		},
-		resolveProjectRoot: func(path string, root string) (ruleMatch, bool) {
-			return markerMatch(path, root, projectMarkers)
+		resolveProjectRoot: func(ctx *scanContext, path string) (ruleMatch, bool) {
+			return markerMatch(ctx, path, projectMarkers)
 		},
 	}
 }
@@ -86,11 +88,11 @@ func pathSuffixRule(kind ArtifactKind, suffix []string, projectMarkers []string)
 func pythonVenvRule() artifactRule {
 	return artifactRule{
 		kind: ArtifactPythonVenv,
-		match: func(path string) bool {
-			return isVirtualEnv(path)
+		match: func(ctx *scanContext, path string) bool {
+			return isVirtualEnv(ctx, path)
 		},
-		resolveProjectRoot: func(path string, root string) (ruleMatch, bool) {
-			projectRoot := inferVenvProjectRoot(path, root)
+		resolveProjectRoot: func(ctx *scanContext, path string) (ruleMatch, bool) {
+			projectRoot := inferVenvProjectRoot(ctx, path)
 			return ruleMatch{
 				projectRoot: projectRoot,
 				distance:    pathDistance(path, projectRoot),
@@ -99,8 +101,8 @@ func pythonVenvRule() artifactRule {
 	}
 }
 
-func markerMatch(path string, root string, markers []string) (ruleMatch, bool) {
-	projectRoot, ok := findNearestAncestorWithMarker(filepath.Dir(path), root, markers)
+func markerMatch(ctx *scanContext, path string, markers []string) (ruleMatch, bool) {
+	projectRoot, ok := findNearestAncestorWithMarker(ctx, filepath.Dir(path), markers)
 	if !ok {
 		return ruleMatch{}, false
 	}
@@ -139,7 +141,7 @@ func hasPathSuffix(path string, suffix []string) bool {
 			return true
 		}
 		parent := filepath.Dir(curr)
-		if samePath(parent, curr) {
+		if parent == curr {
 			return false
 		}
 		curr = parent

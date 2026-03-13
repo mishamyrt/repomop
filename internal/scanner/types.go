@@ -1,24 +1,49 @@
 package scanner
 
-import "sort"
+import (
+	"cmp"
+	"slices"
+)
 
 // ArtifactKind classifies supported removable development artifacts.
-type ArtifactKind string
+type ArtifactKind uint8
 
 // Artifact kind values used by the scanner and UI.
 const (
-	ArtifactPythonVenv ArtifactKind = "python-venv"
-	ArtifactNodeModule ArtifactKind = "node-modules"
-	ArtifactRustTarget ArtifactKind = "rust-target"
-	ArtifactSwiftBuild ArtifactKind = "swift-build"
-	ArtifactJavaGradle ArtifactKind = "java-gradle"
-	ArtifactJavaMaven  ArtifactKind = "java-maven"
-	ArtifactCMake      ArtifactKind = "cmake"
-	ArtifactFlutter    ArtifactKind = "dart-flutter"
-	ArtifactRuby       ArtifactKind = "ruby"
-	ArtifactPHP        ArtifactKind = "php"
-	ArtifactZig        ArtifactKind = "zig"
+	ArtifactPythonVenv ArtifactKind = iota
+	ArtifactNodeModule
+	ArtifactRustTarget
+	ArtifactSwiftBuild
+	ArtifactJavaGradle
+	ArtifactJavaMaven
+	ArtifactCMake
+	ArtifactFlutter
+	ArtifactRuby
+	ArtifactPHP
+	ArtifactZig
 )
+
+var artifactKindNames = [...]string{
+	ArtifactPythonVenv: "python-venv",
+	ArtifactNodeModule: "node-modules",
+	ArtifactRustTarget: "rust-target",
+	ArtifactSwiftBuild: "swift-build",
+	ArtifactJavaGradle: "java-gradle",
+	ArtifactJavaMaven:  "java-maven",
+	ArtifactCMake:      "cmake",
+	ArtifactFlutter:    "dart-flutter",
+	ArtifactRuby:       "ruby",
+	ArtifactPHP:        "php",
+	ArtifactZig:        "zig",
+}
+
+// String returns the display name of the artifact kind.
+func (k ArtifactKind) String() string {
+	if int(k) < len(artifactKindNames) {
+		return artifactKindNames[k]
+	}
+	return "unknown"
+}
 
 // Artifact describes a single removable artifact directory.
 type Artifact struct {
@@ -30,11 +55,11 @@ type Artifact struct {
 
 // SortBySizeDesc sorts artifacts by SizeBytes descending, then by Path ascending.
 func SortBySizeDesc(artifacts []Artifact) {
-	sort.SliceStable(artifacts, func(i, j int) bool {
-		if artifacts[i].SizeBytes == artifacts[j].SizeBytes {
-			return artifacts[i].Path < artifacts[j].Path
+	slices.SortStableFunc(artifacts, func(a, b Artifact) int {
+		if a.SizeBytes != b.SizeBytes {
+			return cmp.Compare(b.SizeBytes, a.SizeBytes)
 		}
-		return artifacts[i].SizeBytes > artifacts[j].SizeBytes
+		return cmp.Compare(a.Path, b.Path)
 	})
 }
 

@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -384,14 +385,14 @@ func TestScanRespectsMaxDepth(t *testing.T) {
 // --- New tests for uncovered paths ---
 
 func TestScanEmptyRootPathReturnsError(t *testing.T) {
-	_, _, err := Scan(ScanOptions{RootPath: "", MaxDepth: -1})
+	_, _, err := Scan(context.Background(), ScanOptions{RootPath: "", MaxDepth: -1})
 	if err == nil {
 		t.Fatal("expected error for empty root path")
 	}
 }
 
 func TestScanNonExistentRootReturnsError(t *testing.T) {
-	_, _, err := Scan(ScanOptions{RootPath: "/nonexistent/path/xyz", MaxDepth: -1})
+	_, _, err := Scan(context.Background(), ScanOptions{RootPath: "/nonexistent/path/xyz", MaxDepth: -1})
 	if err == nil {
 		t.Fatal("expected error for nonexistent root path")
 	}
@@ -402,7 +403,7 @@ func TestScanFileAsRootReturnsError(t *testing.T) {
 	filePath := filepath.Join(root, "file.txt")
 	testutil.WriteFile(t, filePath, "not a dir")
 
-	_, _, err := Scan(ScanOptions{RootPath: filePath, MaxDepth: -1})
+	_, _, err := Scan(context.Background(), ScanOptions{RootPath: filePath, MaxDepth: -1})
 	if err == nil {
 		t.Fatal("expected error for file as root")
 	}
@@ -423,7 +424,7 @@ func TestScanAndMeasureIntegration(t *testing.T) {
 	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
 	testutil.WriteFileSized(t, filepath.Join(project, "node_modules", "dep.js"), 100)
 
-	artifacts, warnings, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	artifacts, warnings, err := ScanAndMeasure(context.Background(), ScanOptions{RootPath: root, MaxDepth: -1})
 	if err != nil {
 		t.Fatalf("ScanAndMeasure failed: %v", err)
 	}
@@ -438,7 +439,7 @@ func TestScanAndMeasureIntegration(t *testing.T) {
 }
 
 func TestScanAndMeasureEmptyRootError(t *testing.T) {
-	_, _, err := ScanAndMeasure(ScanOptions{RootPath: "", MaxDepth: -1})
+	_, _, err := ScanAndMeasure(context.Background(), ScanOptions{RootPath: "", MaxDepth: -1})
 	if err == nil {
 		t.Fatal("expected error for empty root")
 	}
@@ -457,7 +458,7 @@ func TestScanAndMeasureSortsBySize(t *testing.T) {
 	testutil.WriteFile(t, filepath.Join(big, "package.json"), "{}")
 	testutil.WriteFileSized(t, filepath.Join(big, "node_modules", "b.js"), 1000)
 
-	artifacts, _, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	artifacts, _, err := ScanAndMeasure(context.Background(), ScanOptions{RootPath: root, MaxDepth: -1})
 	if err != nil {
 		t.Fatalf("ScanAndMeasure failed: %v", err)
 	}
@@ -610,14 +611,16 @@ func TestFindNearestAncestorNoMarker(t *testing.T) {
 	nested := filepath.Join(root, "a", "b")
 	testutil.MkdirAll(t, nested)
 
-	_, ok := findNearestAncestorWithMarker(nested, root, []string{"nonexistent.marker"})
+	ctx := newScanContext(root)
+	_, ok := findNearestAncestorWithMarker(ctx, nested, []string{"nonexistent.marker"})
 	if ok {
 		t.Fatal("expected no match")
 	}
 }
 
 func TestFindNearestAncestorOutsideRoot(t *testing.T) {
-	_, ok := findNearestAncestorWithMarker("/outside", "/root", []string{"marker"})
+	ctx := newScanContext("/root")
+	_, ok := findNearestAncestorWithMarker(ctx, "/outside", []string{"marker"})
 	if ok {
 		t.Fatal("expected no match outside root")
 	}
@@ -628,7 +631,8 @@ func TestDetectArtifactNoMatch(t *testing.T) {
 	dir := filepath.Join(root, "random-dir")
 	testutil.MkdirAll(t, dir)
 
-	_, ok := detectArtifact(dir, root)
+	ctx := newScanContext(root)
+	_, ok := detectArtifact(ctx, dir)
 	if ok {
 		t.Fatal("expected no match for random directory")
 	}
@@ -652,7 +656,7 @@ func TestScanCollectsWarningsForUnreadableDir(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(unreadable, 0o755) })
 
-	artifacts, warnings, err := Scan(ScanOptions{RootPath: root, MaxDepth: -1})
+	artifacts, warnings, err := Scan(context.Background(), ScanOptions{RootPath: root, MaxDepth: -1})
 	if err != nil {
 		t.Fatalf("scan should not fail: %v", err)
 	}
@@ -672,7 +676,7 @@ func TestScanAndMeasureWithWarnings(t *testing.T) {
 	testutil.WriteFile(t, filepath.Join(project, "package.json"), "{}")
 	testutil.WriteFileSized(t, filepath.Join(project, "node_modules", "dep.js"), 50)
 
-	artifacts, _, err := ScanAndMeasure(ScanOptions{RootPath: root, MaxDepth: -1})
+	artifacts, _, err := ScanAndMeasure(context.Background(), ScanOptions{RootPath: root, MaxDepth: -1})
 	if err != nil {
 		t.Fatalf("ScanAndMeasure failed: %v", err)
 	}
@@ -689,7 +693,7 @@ func TestHasPathSuffixPartialMismatch(t *testing.T) {
 
 func mustScan(t *testing.T, opts ScanOptions) []Artifact {
 	t.Helper()
-	artifacts, _, err := Scan(opts)
+	artifacts, _, err := Scan(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("scan failed: %v", err)
 	}

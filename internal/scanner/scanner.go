@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,16 +18,13 @@ const initialArtifactCapacity = 64
 
 // Scan recursively traverses the root directory and finds known build artifacts.
 // Non-fatal directory read errors are collected as warnings instead of aborting.
-func Scan(opts ScanOptions) ([]Artifact, []error, error) {
+// The scan is cancelled early if ctx is done.
+func Scan(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
 	if opts.RootPath == "" {
 		return nil, nil, fmt.Errorf("root path is required")
 	}
 
-	root, err := filepath.Abs(opts.RootPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolve root path: %w", err)
-	}
-	root = filepath.Clean(root)
+	root := filepath.Clean(opts.RootPath)
 
 	rootInfo, err := os.Stat(root)
 	if err != nil {
@@ -36,15 +34,26 @@ func Scan(opts ScanOptions) ([]Artifact, []error, error) {
 		return nil, nil, fmt.Errorf("root path is not a directory: %s", root)
 	}
 
+	scanCtx := newScanContext(root)
 	stack := []walkItem{{path: root, depth: 0}}
 	artifacts := make([]Artifact, 0, initialArtifactCapacity)
 	var warnings []error
 
 	for len(stack) > 0 {
+		if ctx.Err() != nil {
+			break
+		}
+
 		item := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
-		entries, err := os.ReadDir(item.path)
+		f, err := os.Open(item.path)
+		if err != nil {
+			warnings = append(warnings, fmt.Errorf("read directory %s: %w", item.path, err))
+			continue
+		}
+		entries, err := f.ReadDir(-1)
+		f.Close()
 		if err != nil {
 			warnings = append(warnings, fmt.Errorf("read directory %s: %w", item.path, err))
 			continue
@@ -64,7 +73,7 @@ func Scan(opts ScanOptions) ([]Artifact, []error, error) {
 				continue
 			}
 
-			if artifact, ok := detectArtifact(childPath, root); ok {
+			if artifact, ok := detectArtifact(scanCtx, childPath); ok {
 				artifacts = append(artifacts, artifact)
 				continue
 			}

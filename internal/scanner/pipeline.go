@@ -1,12 +1,16 @@
 package scanner
 
-import "repomop/internal/size"
+import (
+	"context"
+
+	"repomop/internal/size"
+)
 
 // ScanAndMeasure scans for artifacts, measures their sizes, and returns them
 // sorted by size descending. Non-fatal warnings from scanning and size
 // calculation are collected and returned alongside the results.
-func ScanAndMeasure(opts ScanOptions) ([]Artifact, []error, error) {
-	artifacts, scanWarnings, err := Scan(opts)
+func ScanAndMeasure(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
+	artifacts, scanWarnings, err := Scan(ctx, opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -16,13 +20,15 @@ func ScanAndMeasure(opts ScanOptions) ([]Artifact, []error, error) {
 		paths = append(paths, a.Path)
 	}
 
-	sizes, sizeWarnings := size.Directories(paths, size.RecommendedWorkerCount())
+	sizes, sizeWarnings := size.Directories(ctx, paths, size.RecommendedWorkerCount())
 	for i := range artifacts {
 		artifacts[i].SizeBytes = sizes[artifacts[i].Path]
 	}
 
 	SortBySizeDesc(artifacts)
 
-	warnings := append(scanWarnings, sizeWarnings...)
+	warnings := make([]error, 0, len(scanWarnings)+len(sizeWarnings))
+	warnings = append(warnings, scanWarnings...)
+	warnings = append(warnings, sizeWarnings...)
 	return artifacts, warnings, nil
 }
