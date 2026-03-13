@@ -1,6 +1,8 @@
 package format
 
-import "fmt"
+import (
+	"strconv"
+)
 
 var byteUnits = []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB"}
 
@@ -10,7 +12,7 @@ func Bytes(value int64) string {
 		return "0 B"
 	}
 	if value < 1024 {
-		return fmt.Sprintf("%d B", value)
+		return strconv.FormatInt(value, 10) + " B"
 	}
 
 	size := float64(value)
@@ -20,5 +22,5 @@ func Bytes(value int64) string {
 		unit++
 	}
 
-	return fmt.Sprintf("%.1f %s", size, byteUnits[unit])
+	return strconv.FormatFloat(size, 'f', 1, 64) + " " + byteUnits[unit]
 }
