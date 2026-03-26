@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1](https://github.com/mishamyrt/repomop/compare/v0.5.0..v0.5.1) - 2026-03-26
+
+### 🚀 Features
+
+- Add cancellation support
+
+### 🐛 Bug Fixes
+
+- Correctly detect size on APFS
+
+### 🚜 Refactor
+
+- Use bubbletea matche for key handling
+
+### ⚡ Performance
+
+- Decrease memory usage
+- Avoid extra preallocation
+- Optimize size formatting
+
 ## [0.5.0](https://github.com/mishamyrt/repomop/compare/v0.4.0..v0.5.0) - 2026-02-16
 
 ### 🚀 Features

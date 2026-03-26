@@ -1,4 +1,4 @@
-VERSION := 0.5.0
+VERSION := 0.5.1
 TEST_MODULES := $(shell go list ./... | grep -v -e /cmd/)
 
 .PHONY: all
