@@ -41,6 +41,7 @@ Developers accumulate projects over time. Each one carries build artifacts and d
 | Ruby | `.bundle`, `vendor/bundle` |
 | PHP | `vendor` |
 | Zig | `zig-out`, `.zig-cache` |
+| PlatformIO | `.pio` |
 
 Each rule is tied to a project marker file (e.g. `Cargo.toml` for Rust, `package.json` for Node.js), so random directories with the same name won't be misidentified.
 

@@ -21,6 +21,7 @@ const (
 	ArtifactRuby
 	ArtifactPHP
 	ArtifactZig
+	ArtifactPlatformIO
 )
 
 var artifactKindNames = [...]string{
@@ -35,6 +36,7 @@ var artifactKindNames = [...]string{
 	ArtifactRuby:       "ruby",
 	ArtifactPHP:        "php",
 	ArtifactZig:        "zig",
+	ArtifactPlatformIO: "platformio",
 }
 
 // String returns the display name of the artifact kind.

@@ -44,6 +44,8 @@ var defaultArtifactRules = []artifactRule{
 	namedDirRule(ArtifactZig, "zig-out", []string{"build.zig"}),
 	namedDirRule(ArtifactZig, ".zig-cache", []string{"build.zig"}),
 
+	namedDirRule(ArtifactPlatformIO, ".pio", []string{"platformio.ini"}),
+
 	pythonVenvRule(),
 }
 
