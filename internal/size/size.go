@@ -55,16 +55,16 @@ func Directories(ctx context.Context, paths []string, workers int) (map[string]i
 	}
 
 	go func() {
+		defer close(results)
+		defer wg.Wait()
+		defer close(jobs)
 		for _, path := range paths {
 			select {
 			case <-ctx.Done():
-				break
+				return
 			case jobs <- path:
 			}
 		}
-		close(jobs)
-		wg.Wait()
-		close(results)
 	}()
 
 	var warnings []error
@@ -80,7 +80,7 @@ func directorySize(path string) (int64, []error) {
 	var total int64
 	var warnings []error
 
-	_ = filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			warnings = append(warnings, err)
 			if d != nil && d.IsDir() {
@@ -105,7 +105,7 @@ func directorySize(path string) (int64, []error) {
 			warnings = append(warnings, err)
 			return nil
 		}
-		total += reclaimableFileSize(info)
+		total += reclaimableFileSize(filePath, info)
 		return nil
 	})
 
