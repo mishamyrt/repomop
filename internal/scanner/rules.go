@@ -7,13 +7,14 @@ import (
 )
 
 // scanContext holds per-scan state shared across detectArtifact calls:
-// a rule index for O(1) name-based lookup and a stat cache to avoid
-// repeated os.Stat calls for the same marker files.
+// a rule index for O(1) name-based lookup, a stat cache for exact
+// marker files, and a marker cache for exact or glob marker checks.
 type scanContext struct {
-	root            string
-	fileExistsCache map[string]bool
-	ruleIndex       map[string][]artifactRule
-	specialRules    []artifactRule
+	root              string
+	fileExistsCache   map[string]bool
+	markerExistsCache map[string]bool
+	ruleIndex         map[string][]artifactRule
+	specialRules      []artifactRule
 }
 
 func newScanContext(root string) *scanContext {
@@ -27,10 +28,11 @@ func newScanContext(root string) *scanContext {
 		}
 	}
 	return &scanContext{
-		root:            root,
-		fileExistsCache: make(map[string]bool, 256),
-		ruleIndex:       idx,
-		specialRules:    special,
+		root:              root,
+		fileExistsCache:   make(map[string]bool, 256),
+		markerExistsCache: make(map[string]bool, 256),
+		ruleIndex:         idx,
+		specialRules:      special,
 	}
 }
 
@@ -103,7 +105,7 @@ func findNearestAncestorWithMarker(ctx *scanContext, start string, markers []str
 			return "", false
 		}
 		for _, marker := range markers {
-			if cachedIsFile(ctx, filepath.Join(curr, marker)) {
+			if cachedHasMarker(ctx, curr, marker) {
 				return curr, true
 			}
 		}
@@ -124,6 +126,31 @@ func isWithinRoot(path string, root string) bool {
 		return false
 	}
 	return !strings.HasPrefix(rel, "..")
+}
+
+func cachedHasMarker(ctx *scanContext, dir string, marker string) bool {
+	cacheKey := dir + "\x00" + marker
+	if v, ok := ctx.markerExistsCache[cacheKey]; ok {
+		return v
+	}
+
+	var result bool
+	if strings.ContainsAny(marker, "*?[") {
+		matches, err := filepath.Glob(filepath.Join(dir, marker))
+		if err == nil {
+			for _, match := range matches {
+				if cachedIsFile(ctx, match) {
+					result = true
+					break
+				}
+			}
+		}
+	} else {
+		result = cachedIsFile(ctx, filepath.Join(dir, marker))
+	}
+
+	ctx.markerExistsCache[cacheKey] = result
+	return result
 }
 
 func cachedIsFile(ctx *scanContext, path string) bool {
