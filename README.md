@@ -50,6 +50,14 @@ Each rule is tied to a project marker file or file pattern (e.g. `Cargo.toml` fo
 
 ## Installation
 
+### Homebrew
+
+```
+brew install mishamyrt/tap/repomop
+```
+
+### Script
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mishamyrt/repomop/master/install.sh | sh
 ```
