@@ -20,7 +20,9 @@ func ScanAndMeasure(ctx context.Context, opts ScanOptions) ([]Artifact, []error,
 		paths = append(paths, a.Path)
 	}
 
-	sizes, sizeWarnings := size.Directories(ctx, paths, size.RecommendedWorkerCount())
+	sizes, sizeWarnings := size.Directories(ctx, paths, size.RecommendedWorkerCount(), size.Options{
+		IncludeLinks: opts.IncludeLinks,
+	})
 	for i := range artifacts {
 		artifacts[i].SizeBytes = sizes[artifacts[i].Path]
 	}

@@ -471,6 +471,35 @@ func TestScanSkipsSymlinkDirectories(t *testing.T) {
 	}
 }
 
+func TestScanIncludesSymlinkedProjectsWhenRequested(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink requires privileges on windows")
+	}
+
+	work := t.TempDir()
+	root := filepath.Join(work, "scan")
+	testutil.MkdirAll(t, root)
+
+	externalProject := filepath.Join(work, "external", "project")
+	testutil.MkdirAll(t, filepath.Join(externalProject, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(externalProject, "package.json"), "{}")
+
+	projectLink := filepath.Join(root, "project-link")
+	testutil.Symlink(t, externalProject, projectLink)
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1, IncludeLinks: true})
+
+	nodeArtifacts := artifactsByKind(artifacts, ArtifactNodeModule)
+	if len(nodeArtifacts) != 1 {
+		t.Fatalf("expected 1 node_modules artifact, got %d", len(nodeArtifacts))
+	}
+
+	expectedPath := filepath.Join(projectLink, "node_modules")
+	if nodeArtifacts[0].Path != expectedPath {
+		t.Fatalf("expected artifact path %s, got %s", expectedPath, nodeArtifacts[0].Path)
+	}
+}
+
 func TestScanRespectsMaxDepth(t *testing.T) {
 	root := t.TempDir()
 

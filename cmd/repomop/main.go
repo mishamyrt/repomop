@@ -24,11 +24,12 @@ var (
 )
 
 type cliOptions struct {
-	path     string
-	maxDepth int
-	dryRun   bool
-	yes      bool
-	version  bool
+	path         string
+	maxDepth     int
+	dryRun       bool
+	yes          bool
+	version      bool
+	includeLinks bool
 }
 
 func main() {
@@ -57,8 +58,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	scanOpts := scanner.ScanOptions{
-		RootPath: rootPath,
-		MaxDepth: opts.maxDepth,
+		RootPath:     rootPath,
+		MaxDepth:     opts.maxDepth,
+		IncludeLinks: opts.includeLinks,
 	}
 
 	if opts.dryRun || opts.yes {
@@ -117,6 +119,7 @@ func parseFlags(args []string, stdout io.Writer) (cliOptions, error) {
 	fs.BoolVar(&opts.dryRun, "dry-run", false, "list artifacts without deleting")
 	fs.BoolVar(&opts.yes, "yes", false, "delete all found artifacts without interactive confirmation")
 	fs.BoolVar(&opts.version, "version", false, "print version and exit")
+	fs.BoolVar(&opts.includeLinks, "include-links", false, "follow symlinked directories and count hard-linked files")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

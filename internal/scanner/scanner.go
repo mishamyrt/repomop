@@ -38,6 +38,7 @@ func Scan(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
 	stack := []walkItem{{path: root, depth: 0}}
 	artifacts := make([]Artifact, 0, initialArtifactCapacity)
 	var warnings []error
+	visitedDirs := make(map[string]struct{})
 
 	for len(stack) > 0 {
 		if ctx.Err() != nil {
@@ -46,6 +47,19 @@ func Scan(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
 
 		item := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
+
+		if opts.IncludeLinks {
+			realPath, err := filepath.EvalSymlinks(item.path)
+			if err != nil {
+				warnings = append(warnings, fmt.Errorf("resolve directory %s: %w", item.path, err))
+				continue
+			}
+			realPath = filepath.Clean(realPath)
+			if _, ok := visitedDirs[realPath]; ok {
+				continue
+			}
+			visitedDirs[realPath] = struct{}{}
+		}
 
 		f, err := os.Open(item.path)
 		if err != nil {
@@ -59,15 +73,19 @@ func Scan(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
 			continue
 		}
 
+		symlinkChildren := make([]walkItem, 0)
+		regularChildren := make([]walkItem, 0, len(entries))
 		for _, entry := range entries {
-			if !entry.IsDir() {
+			childPath := filepath.Join(item.path, entry.Name())
+			isDir, isSymlinkDir, err := directoryEntryStatus(childPath, entry, opts.IncludeLinks)
+			if err != nil {
+				warnings = append(warnings, fmt.Errorf("resolve directory %s: %w", childPath, err))
 				continue
 			}
-			if entry.Type()&fs.ModeSymlink != 0 {
+			if !isDir {
 				continue
 			}
 
-			childPath := filepath.Join(item.path, entry.Name())
 			childDepth := item.depth + 1
 			if opts.MaxDepth >= 0 && childDepth > opts.MaxDepth {
 				continue
@@ -78,9 +96,32 @@ func Scan(ctx context.Context, opts ScanOptions) ([]Artifact, []error, error) {
 				continue
 			}
 
-			stack = append(stack, walkItem{path: childPath, depth: childDepth})
+			child := walkItem{path: childPath, depth: childDepth}
+			if isSymlinkDir {
+				symlinkChildren = append(symlinkChildren, child)
+				continue
+			}
+			regularChildren = append(regularChildren, child)
 		}
+
+		stack = append(stack, symlinkChildren...)
+		stack = append(stack, regularChildren...)
 	}
 
 	return artifacts, warnings, nil
+}
+
+func directoryEntryStatus(path string, entry fs.DirEntry, includeLinks bool) (bool, bool, error) {
+	if entry.IsDir() {
+		return true, false, nil
+	}
+	if entry.Type()&fs.ModeSymlink == 0 || !includeLinks {
+		return false, false, nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, true, err
+	}
+	return info.IsDir(), true, nil
 }

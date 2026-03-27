@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -76,6 +77,33 @@ func TestRunRejectsInvalidFlags(t *testing.T) {
 	}
 }
 
+func TestRunDryRunIncludeLinksScansSymlinkedProjects(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink requires privileges on windows")
+	}
+
+	work := t.TempDir()
+	root := filepath.Join(work, "scan")
+	testutil.MkdirAll(t, root)
+
+	externalProject := filepath.Join(work, "external", "project")
+	testutil.MkdirAll(t, filepath.Join(externalProject, "node_modules"))
+	testutil.WriteFile(t, filepath.Join(externalProject, "package.json"), "{}")
+	testutil.WriteFile(t, filepath.Join(externalProject, "node_modules", "a.js"), "console.log('x')")
+
+	testutil.Symlink(t, externalProject, filepath.Join(root, "project-link"))
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	exitCode := run([]string{"--path", root, "--dry-run", "--include-links"}, stdout, stderr)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d, stderr=%s", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "project-link/node_modules") {
+		t.Fatalf("expected symlinked project artifact in output, got: %s", stdout.String())
+	}
+}
+
 func TestPrintDryRunUsesSizePathTypeFormat(t *testing.T) {
 	root := filepath.Join(string(filepath.Separator), "repo")
 	artifacts := []scanner.Artifact{
@@ -100,4 +128,3 @@ func TestPrintDryRunUsesSizePathTypeFormat(t *testing.T) {
 		t.Fatalf("artifact line must be in 'size path type' order:\n%s", output)
 	}
 }
-

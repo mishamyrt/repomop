@@ -23,12 +23,12 @@ const (
 // of the global content-addressable store. Deleting a clone does not free the shared extents,
 // so the reclaimable space is only the private bytes. Hard-linked files
 // (Nlink > 1) are also excluded because the data survives in the store.
-func reclaimableFileSize(path string, info fs.FileInfo) int64 {
+func reclaimableFileSize(path string, info fs.FileInfo, includeLinks bool) int64 {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return info.Size()
 	}
-	if stat.Nlink > 1 {
+	if !includeLinks && stat.Nlink > 1 {
 		return 0
 	}
 	ps, err := privateDataSize(path)

@@ -88,6 +88,9 @@ repomop --path ~/Projects
 | `--max-depth` | Maximum traversal depth (`-1` for unlimited) |
 | `--dry-run` | List found artifacts without deleting anything |
 | `--yes` | Skip confirmation and delete all found artifacts |
+| `--include-links` | Follow symlinked directories and count hard-linked files while scanning |
+
+`--include-links` is opt-in because it can overstate freed space: symlink targets and shared hard-linked data may still be referenced elsewhere.
 
 ### Controls
 

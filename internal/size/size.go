@@ -2,11 +2,16 @@ package size
 
 import (
 	"context"
-	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 )
+
+// Options configures directory size calculation.
+type Options struct {
+	IncludeLinks bool
+}
 
 type jobResult struct {
 	path     string
@@ -29,7 +34,7 @@ func RecommendedWorkerCount() int {
 // Directories calculates recursive sizes for each directory path.
 // It stops dispatching new jobs if ctx is cancelled, but waits for
 // already-running jobs to finish before returning.
-func Directories(ctx context.Context, paths []string, workers int) (map[string]int64, []error) {
+func Directories(ctx context.Context, paths []string, workers int, opts Options) (map[string]int64, []error) {
 	if workers < 1 {
 		workers = 1
 	}
@@ -48,7 +53,7 @@ func Directories(ctx context.Context, paths []string, workers int) (map[string]i
 		go func() {
 			defer wg.Done()
 			for path := range jobs {
-				size, warnings := directorySize(path)
+				size, warnings := directorySize(path, opts)
 				results <- jobResult{path: path, size: size, warnings: warnings}
 			}
 		}()
@@ -76,38 +81,81 @@ func Directories(ctx context.Context, paths []string, workers int) (map[string]i
 	return sizes, warnings
 }
 
-func directorySize(path string) (int64, []error) {
-	var total int64
-	var warnings []error
+func directorySize(path string, opts Options) (int64, []error) {
+	walker := sizeWalker{
+		opts:        opts,
+		visitedDirs: make(map[string]struct{}),
+	}
+	walker.walk(path)
+	return walker.total, walker.warnings
+}
 
-	_ = filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
+type sizeWalker struct {
+	opts        Options
+	total       int64
+	warnings    []error
+	visitedDirs map[string]struct{}
+}
+
+func (w *sizeWalker) walk(path string) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		w.warnings = append(w.warnings, err)
+		return
+	}
+
+	mode := info.Mode()
+	if mode&os.ModeSymlink != 0 {
+		if !w.opts.IncludeLinks {
+			return
+		}
+
+		targetInfo, err := os.Stat(path)
 		if err != nil {
-			warnings = append(warnings, err)
-			if d != nil && d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
+			w.warnings = append(w.warnings, err)
+			return
 		}
-
-		if d.Type()&fs.ModeSymlink != 0 {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
+		if targetInfo.IsDir() {
+			w.walkDirectory(path)
+			return
 		}
-
-		if !d.Type().IsRegular() {
-			return nil
+		if targetInfo.Mode().IsRegular() {
+			w.total += reclaimableFileSize(path, targetInfo, true)
 		}
+		return
+	}
 
-		info, err := d.Info()
+	if info.IsDir() {
+		w.walkDirectory(path)
+		return
+	}
+	if !mode.IsRegular() {
+		return
+	}
+
+	w.total += reclaimableFileSize(path, info, w.opts.IncludeLinks)
+}
+
+func (w *sizeWalker) walkDirectory(path string) {
+	if w.opts.IncludeLinks {
+		realPath, err := filepath.EvalSymlinks(path)
 		if err != nil {
-			warnings = append(warnings, err)
-			return nil
+			w.warnings = append(w.warnings, err)
+			return
 		}
-		total += reclaimableFileSize(filePath, info)
-		return nil
-	})
+		realPath = filepath.Clean(realPath)
+		if _, ok := w.visitedDirs[realPath]; ok {
+			return
+		}
+		w.visitedDirs[realPath] = struct{}{}
+	}
 
-	return total, warnings
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		w.warnings = append(w.warnings, err)
+		return
+	}
+	for _, entry := range entries {
+		w.walk(filepath.Join(path, entry.Name()))
+	}
 }

@@ -73,6 +73,7 @@ func SortBySizeDesc(artifacts []Artifact) {
 
 // ScanOptions configures repository scanning.
 type ScanOptions struct {
-	RootPath string
-	MaxDepth int
+	RootPath     string
+	MaxDepth     int
+	IncludeLinks bool
 }

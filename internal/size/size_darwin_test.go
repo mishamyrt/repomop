@@ -31,7 +31,7 @@ func TestDirectoriesExcludesCOWClones(t *testing.T) {
 		t.Skipf("clonefile not supported: %v", err)
 	}
 
-	sizes, errs := Directories(context.Background(), []string{dir}, 1)
+	sizes, errs := Directories(context.Background(), []string{dir}, 1, Options{})
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got %d", len(errs))
 	}
