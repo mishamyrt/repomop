@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/mishamyrt/repomop/compare/v0.5.1..v0.6.0) - 2026-03-27
+
+### 🚀 Features
+
+- Add platformio artifacts support
+- Improve confirmation dialog
+- Add loading title animation
+- Add glob lookup
+- Add Elixir, Haskell and Terraform support
+- Add links following option
+
 ## [0.5.1](https://github.com/mishamyrt/repomop/compare/v0.5.0..v0.5.1) - 2026-03-26
 
 ### 🚀 Features
