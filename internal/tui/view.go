@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	titleStyle          = lipgloss.NewStyle().Bold(true)
 	subtitleStyle       = lipgloss.NewStyle().Faint(true)
 	warnStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	errStyle            = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
@@ -135,42 +135,60 @@ func (m Model) renderArtifactLine(idx int, sizeWidth int) string {
 }
 
 func (m Model) renderConfirmView() string {
-	selected := m.cachedSelection
-	if selected == nil {
-		selected = m.selectedArtifacts()
-	}
+	selected := m.confirmArtifacts()
 	sum := int64(0)
 	for _, artifact := range selected {
 		sum += artifact.SizeBytes
 	}
 
-	lines := []string{
-		titleStyle.Render("Confirm deletion"),
-		"",
-		fmt.Sprintf("Artifacts selected: %d", len(selected)),
-		fmt.Sprintf("Estimated free space: %s", format.Bytes(sum)),
-		dimStyle.Render("This action permanently removes directories."),
-		"",
-		"Proceed? [y/N]",
+	selectionLabel := fmt.Sprintf("%d artifacts will be permanently deleted", len(selected))
+	if len(selected) == 1 {
+		selectionLabel = "1 artifact will be permanently deleted"
 	}
+
+	lines := []string{
+		titleStyle.Render("Delete selected artifacts?"),
+		"",
+		selectionLabel,
+		fmt.Sprintf("Estimated space to free: %s", sizeStyle.Render(format.Bytes(sum))),
+		"",
+		warnStyle.Render("This action cannot be undone."),
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, "Items to delete:")
 
 	if len(selected) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, "Top selections:")
-		limit := len(selected)
-		if limit > 5 {
-			limit = 5
+		start, end := m.confirmVisibleRange(len(selected))
+		for i := start; i < end; i++ {
+			lines = append(lines, m.renderConfirmArtifactLine(selected[i]))
 		}
-		for i := 0; i < limit; i++ {
-			artifact := selected[i]
-			lines = append(lines, fmt.Sprintf("- %s (%s)", pathutil.RelativePathOrSelf(m.opts.RootPath, artifact.Path), format.Bytes(artifact.SizeBytes)))
-		}
-		if len(selected) > limit {
-			lines = append(lines, dimStyle.Render(fmt.Sprintf("... and %d more", len(selected)-limit)))
-		}
+	} else {
+		lines = append(lines, dimStyle.Render("No artifacts selected."))
 	}
 
+	lines = append(lines, "")
+	lines = append(lines, "Press Y to delete, or N to cancel: [y/N]")
+	lines = append(lines, helpStyle.Render("↑↓ Review items | y delete | n/esc cancel | q quit"))
+
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderConfirmArtifactLine(artifact scanner.Artifact) string {
+	totalWidth := m.width
+	if totalWidth <= 0 {
+		totalWidth = 80
+	}
+
+	sizeTextRaw := fmt.Sprintf("(%s)", format.Bytes(artifact.SizeBytes))
+	const bullet = "- "
+	pathWidth := totalWidth - lipgloss.Width(bullet) - lipgloss.Width(sizeTextRaw) - 1
+	if pathWidth < 1 {
+		pathWidth = 1
+	}
+
+	pathTextRaw := truncatePathLeft(pathutil.RelativePathOrSelf(m.opts.RootPath, artifact.Path), pathWidth)
+	return bullet + pathStyle.Render(pathTextRaw) + " " + sizeStyle.Render(sizeTextRaw)
 }
 
 func (m Model) renderDeletingView() string {
@@ -241,31 +259,101 @@ func (m Model) renderErrorView() string {
 // subtitle + summary + blank + (warning + blank) + help.
 const listViewChromeLines = 6
 
+// confirmViewChromeLines is the number of non-list lines in confirm view:
+// title + summary + warning + header + footer/prompt lines.
+const confirmViewChromeLines = 11
+
 func (m Model) visibleRange() (int, int) {
-	if len(m.artifacts) == 0 {
+	return visibleRangeFor(len(m.artifacts), m.cursor, m.height, listViewChromeLines, 5)
+}
+
+func (m Model) confirmVisibleRange(total int) (int, int) {
+	return visibleRangeFromOffset(total, m.confirmOffset, m.height, confirmViewChromeLines, 3)
+}
+
+func visibleRangeFor(total int, cursor int, height int, chromeLines int, minListHeight int) (int, int) {
+	if total == 0 {
 		return 0, 0
 	}
-	listHeight := m.height - listViewChromeLines
-	if listHeight < 5 {
-		listHeight = 5
+
+	listHeight := height - chromeLines
+	if height <= 0 || listHeight < minListHeight {
+		listHeight = minListHeight
 	}
-	if listHeight > len(m.artifacts) {
-		listHeight = len(m.artifacts)
+	if listHeight > total {
+		listHeight = total
 	}
 
-	start := m.cursor - listHeight + 1
+	cursor = clampIndex(cursor, total)
+	start := cursor - listHeight + 1
 	if start < 0 {
 		start = 0
 	}
 	end := start + listHeight
-	if end > len(m.artifacts) {
-		end = len(m.artifacts)
+	if end > total {
+		end = total
 		start = end - listHeight
 		if start < 0 {
 			start = 0
 		}
 	}
 	return start, end
+}
+
+func visibleRangeFromOffset(total int, offset int, height int, chromeLines int, minListHeight int) (int, int) {
+	if total == 0 {
+		return 0, 0
+	}
+
+	listHeight := listHeightFor(total, height, chromeLines, minListHeight)
+	maxOffset := total - listHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	return offset, offset + listHeight
+}
+
+func listHeightFor(total int, height int, chromeLines int, minListHeight int) int {
+	if total <= 0 {
+		return 0
+	}
+
+	listHeight := height - chromeLines
+	if height <= 0 || listHeight < minListHeight {
+		listHeight = minListHeight
+	}
+	if listHeight > total {
+		listHeight = total
+	}
+	return listHeight
+}
+
+func (m Model) maxConfirmOffset(total int) int {
+	listHeight := listHeightFor(total, m.height, confirmViewChromeLines, 3)
+	maxOffset := total - listHeight
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+func clampIndex(cursor int, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	if cursor < 0 {
+		return 0
+	}
+	if cursor >= total {
+		return total - 1
+	}
+	return cursor
 }
 
 func computeSizeColumnWidth(artifacts []scanner.Artifact) int {
@@ -396,4 +484,3 @@ func tailByWidth(value string, maxWidth int) string {
 	slices.Reverse(tail)
 	return string(tail)
 }
-

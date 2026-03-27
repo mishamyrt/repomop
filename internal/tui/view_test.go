@@ -303,8 +303,10 @@ func TestViewDoneWithFatalError(t *testing.T) {
 
 func TestViewConfirm(t *testing.T) {
 	m := Model{
-		opts:  scanner.ScanOptions{RootPath: "/repo"},
-		state: stateConfirm,
+		opts:   scanner.ScanOptions{RootPath: "/repo"},
+		state:  stateConfirm,
+		width:  120,
+		height: 20,
 		artifacts: []scanner.Artifact{
 			{Kind: scanner.ArtifactNodeModule, Path: "/repo/a/node_modules", SizeBytes: 1024},
 			{Kind: scanner.ArtifactRustTarget, Path: "/repo/b/target", SizeBytes: 2048},
@@ -314,18 +316,40 @@ func TestViewConfirm(t *testing.T) {
 		selectedSize:  3072,
 	}
 	output := stripANSI(m.View())
-	if !strings.Contains(output, "Confirm deletion") {
+	if !strings.Contains(output, "Delete selected artifacts?") {
 		t.Fatalf("expected confirm title, got:\n%s", output)
 	}
-	if !strings.Contains(output, "Artifacts selected: 2") {
+	if !strings.Contains(output, "2 artifacts will be permanently deleted") {
 		t.Fatalf("expected selection count, got:\n%s", output)
 	}
-	if !strings.Contains(output, "Proceed? [y/N]") {
+	if !strings.Contains(output, "Estimated space to free: 3.0 KiB") {
+		t.Fatalf("expected free space summary, got:\n%s", output)
+	}
+	if !strings.Contains(output, "This action cannot be undone.") {
+		t.Fatalf("expected warning, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Items to delete:") {
+		t.Fatalf("expected items header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Press Y to delete, or N to cancel: [y/N]") {
 		t.Fatalf("expected proceed prompt, got:\n%s", output)
+	}
+	if strings.Contains(output, "Enter to cancel") {
+		t.Fatalf("confirm prompt must not mention enter cancellation:\n%s", output)
+	}
+	lines := strings.Split(output, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("unexpected confirm output:\n%s", output)
+	}
+	if lines[len(lines)-2] != "Press Y to delete, or N to cancel: [y/N]" {
+		t.Fatalf("expected prompt before help, got:\n%s", output)
+	}
+	if !strings.Contains(lines[len(lines)-1], "↑↓ Review items | y delete | n/esc cancel | q quit") {
+		t.Fatalf("expected help as last line, got:\n%s", output)
 	}
 }
 
-func TestViewConfirmMoreThanFive(t *testing.T) {
+func TestViewConfirmShowsAllItemsWhenHeightAllows(t *testing.T) {
 	arts := make([]scanner.Artifact, 7)
 	selected := make(map[int]struct{})
 	for i := range arts {
@@ -342,10 +366,50 @@ func TestViewConfirmMoreThanFive(t *testing.T) {
 		artifacts:     arts,
 		selected:      selected,
 		selectedCount: 7,
+		width:         120,
+		height:        24,
 	}
 	output := stripANSI(m.View())
-	if !strings.Contains(output, "and 2 more") {
-		t.Fatalf("expected '... and 2 more', got:\n%s", output)
+	if strings.Contains(output, "and 2 more") {
+		t.Fatalf("confirm view must not collapse to top 5 items:\n%s", output)
+	}
+	if !strings.Contains(output, "p6/node_modules") {
+		t.Fatalf("expected last item to be visible when height allows it:\n%s", output)
+	}
+}
+
+func TestRenderConfirmViewScrollsSelectedArtifacts(t *testing.T) {
+	arts := make([]scanner.Artifact, 8)
+	selected := make(map[int]struct{}, len(arts))
+	for i := range arts {
+		arts[i] = scanner.Artifact{
+			Kind:      scanner.ArtifactNodeModule,
+			Path:      fmt.Sprintf("/repo/p%d/node_modules", i),
+			SizeBytes: int64((i + 1) * 1024),
+		}
+		selected[i] = struct{}{}
+	}
+
+	m := Model{
+		opts:          scanner.ScanOptions{RootPath: "/repo"},
+		state:         stateConfirm,
+		artifacts:     arts,
+		selected:      selected,
+		selectedCount: len(selected),
+		confirmOffset: 3,
+		width:         120,
+		height:        14,
+	}
+
+	output := stripANSI(m.renderConfirmView())
+	if strings.Contains(output, "p7/node_modules") {
+		t.Fatalf("expected top items to be scrolled out of view:\n%s", output)
+	}
+	if !strings.Contains(output, "p4/node_modules") || !strings.Contains(output, "p2/node_modules") {
+		t.Fatalf("expected visible scrolled window:\n%s", output)
+	}
+	if strings.Contains(output, "▶ - ") {
+		t.Fatalf("confirm list must not show a focused marker:\n%s", output)
 	}
 }
 
@@ -584,6 +648,36 @@ func TestVisibleRangeEndCapped(t *testing.T) {
 	start, end := m.visibleRange()
 	if end != 10 {
 		t.Fatalf("expected end 10, got %d", end)
+	}
+	if start != 5 {
+		t.Fatalf("expected start 5, got %d", start)
+	}
+}
+
+func TestConfirmVisibleRangeEmpty(t *testing.T) {
+	m := Model{height: 20}
+	start, end := m.confirmVisibleRange(0)
+	if start != 0 || end != 0 {
+		t.Fatalf("expected 0,0 got %d,%d", start, end)
+	}
+}
+
+func TestConfirmVisibleRangeSmallHeight(t *testing.T) {
+	m := Model{height: 10, confirmOffset: 4}
+	start, end := m.confirmVisibleRange(8)
+	if start != 4 || end != 7 {
+		t.Fatalf("expected 4,7 got %d,%d", start, end)
+	}
+	if end-start != 3 {
+		t.Fatalf("expected 3 visible rows, got %d", end-start)
+	}
+}
+
+func TestConfirmVisibleRangeCursorAtEnd(t *testing.T) {
+	m := Model{height: 14, confirmOffset: 7}
+	start, end := m.confirmVisibleRange(8)
+	if end != 8 {
+		t.Fatalf("expected end 8, got %d", end)
 	}
 	if start != 5 {
 		t.Fatalf("expected start 5, got %d", start)

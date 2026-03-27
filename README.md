@@ -90,11 +90,13 @@ repomop --path ~/Projects
 
 | Key | Action |
 |---|---|
-| `Up` / `Down` or `k` / `j` | Move through the list |
+| `Up` / `Down` or `k` / `j` | Move through the artifact list and the confirmation list |
 | `Space` | Select / deselect an item |
-| `Enter` | Proceed to confirmation |
+| `Enter` | Proceed to confirmation from the selection list |
 | `y` | Confirm deletion |
 | `n` or `Esc` | Cancel and return to the list |
 | `q` or `Ctrl+C` | Quit |
+
+On the confirmation screen, `Enter` is intentionally ignored to avoid accidental cancellation.
 
 > **Warning:** Deletion is permanent. Selected directories are removed with `os.RemoveAll`.

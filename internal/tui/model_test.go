@@ -84,14 +84,15 @@ func TestListViewEscQuits(t *testing.T) {
 	}
 }
 
-func TestConfirmViewEscQuits(t *testing.T) {
+func TestConfirmViewEscReturnsToList(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if cmd == nil {
-		t.Fatal("expected quit command on esc key")
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	got := updated.(Model)
+	if got.state != stateList {
+		t.Fatalf("expected stateList, got %v", got.state)
 	}
-	if _, ok := cmd().(tea.QuitMsg); !ok {
-		t.Fatal("expected esc key to trigger quit from confirm view")
+	if cmd != nil {
+		t.Fatal("expected esc key to cancel confirm without quitting")
 	}
 }
 
@@ -238,6 +239,80 @@ func TestConfirmNReturnsToList(t *testing.T) {
 	got := updated.(Model)
 	if got.state != stateList {
 		t.Fatalf("expected stateList, got %v", got.state)
+	}
+}
+
+func TestConfirmEnterDoesNothing(t *testing.T) {
+	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(Model)
+	if got.state != stateConfirm {
+		t.Fatalf("expected stateConfirm, got %v", got.state)
+	}
+	if cmd != nil {
+		t.Fatal("expected no command for enter in confirm view")
+	}
+}
+
+func TestConfirmCursorDown(t *testing.T) {
+	artifacts := []scanner.Artifact{
+		{Path: "/repo/a", SizeBytes: 1},
+		{Path: "/repo/b", SizeBytes: 2},
+		{Path: "/repo/c", SizeBytes: 3},
+		{Path: "/repo/d", SizeBytes: 4},
+		{Path: "/repo/e", SizeBytes: 5},
+		{Path: "/repo/f", SizeBytes: 6},
+	}
+	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}, 4: {}, 5: {}})
+	m.height = 13
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got := updated.(Model)
+	if got.confirmOffset != 1 {
+		t.Fatalf("expected confirmOffset 1, got %d", got.confirmOffset)
+	}
+}
+
+func TestConfirmCursorUpAtZero(t *testing.T) {
+	artifacts := []scanner.Artifact{
+		{Path: "/repo/a", SizeBytes: 1},
+		{Path: "/repo/b", SizeBytes: 2},
+		{Path: "/repo/c", SizeBytes: 3},
+		{Path: "/repo/d", SizeBytes: 4},
+	}
+	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}})
+	m.height = 13
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	got := updated.(Model)
+	if got.confirmOffset != 0 {
+		t.Fatalf("expected confirmOffset 0, got %d", got.confirmOffset)
+	}
+}
+
+func TestConfirmCursorJAndK(t *testing.T) {
+	artifacts := []scanner.Artifact{
+		{Path: "/repo/a", SizeBytes: 1},
+		{Path: "/repo/b", SizeBytes: 2},
+		{Path: "/repo/c", SizeBytes: 3},
+		{Path: "/repo/d", SizeBytes: 4},
+		{Path: "/repo/e", SizeBytes: 5},
+		{Path: "/repo/f", SizeBytes: 6},
+	}
+	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}, 4: {}, 5: {}})
+	m.height = 13
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got := updated.(Model)
+	if got.confirmOffset != 1 {
+		t.Fatalf("expected confirmOffset 1 after j, got %d", got.confirmOffset)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got = updated.(Model)
+	if got.confirmOffset != 0 {
+		t.Fatalf("expected confirmOffset 0 after k, got %d", got.confirmOffset)
 	}
 }
 

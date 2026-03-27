@@ -65,6 +65,7 @@ type Model struct {
 	selected        map[int]struct{}
 	cachedSelection []scanner.Artifact
 	cursor          int
+	confirmOffset   int
 	scanWarnings    []error
 	deleteResult    deleter.Result
 
@@ -179,6 +180,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 				m.cachedSelection = m.selectedArtifacts()
+				m.confirmOffset = 0
 				m.state = stateConfirm
 				m.message = ""
 			case key.Matches(typed, keys.Quit):
@@ -188,24 +190,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		case stateConfirm:
+			selected := m.confirmArtifacts()
 			switch {
-			case key.Matches(typed, keys.Yes):
-				selected := m.cachedSelection
-				if selected == nil {
-					selected = m.selectedArtifacts()
+			case typed.Type == tea.KeyEsc:
+				m.cachedSelection = nil
+				m.confirmOffset = 0
+				m.state = stateList
+			case key.Matches(typed, keys.Up):
+				if m.confirmOffset > 0 {
+					m.confirmOffset--
 				}
+			case key.Matches(typed, keys.Down):
+				if m.confirmOffset < m.maxConfirmOffset(len(selected)) {
+					m.confirmOffset++
+				}
+			case key.Matches(typed, keys.Yes):
 				if len(selected) == 0 {
 					m.cachedSelection = nil
+					m.confirmOffset = 0
 					m.state = stateList
 					break
 				}
 				m.cachedSelection = nil
+				m.confirmOffset = 0
 				m.state = stateDeleting
 				m.message = ""
 				cmds = append(cmds, m.spinner.Tick)
 				cmds = append(cmds, deleteArtifactsCmd(m.ctx, selected))
+			case key.Matches(typed, keys.Enter):
+				// Ignore Enter in confirm view to avoid accidental cancellations.
 			case key.Matches(typed, keys.No):
 				m.cachedSelection = nil
+				m.confirmOffset = 0
 				m.state = stateList
 			case key.Matches(typed, keys.Quit):
 				if m.cancel != nil {
@@ -253,6 +269,13 @@ func (m Model) selectedArtifacts() []scanner.Artifact {
 	scanner.SortBySizeDesc(selected)
 
 	return selected
+}
+
+func (m Model) confirmArtifacts() []scanner.Artifact {
+	if m.cachedSelection != nil {
+		return m.cachedSelection
+	}
+	return m.selectedArtifacts()
 }
 
 func scanArtifactsCmd(ctx context.Context, opts scanner.ScanOptions) tea.Cmd {
