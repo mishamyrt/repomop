@@ -45,16 +45,12 @@ func Directories(ctx context.Context, paths []string, workers int, opts Options)
 	results := make(chan jobResult)
 
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for path := range jobs {
-				size, warnings := directorySize(path, opts)
-				results <- jobResult{path: path, size: size, warnings: warnings}
-			}
-		}()
-	}
+	wg.Go(func() {
+		for path := range jobs {
+			size, warnings := directorySize(path, opts)
+			results <- jobResult{path: path, size: size, warnings: warnings}
+		}
+	})
 
 	go func() {
 		defer close(results)
