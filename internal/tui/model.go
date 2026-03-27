@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -52,6 +53,14 @@ type deleteFinishedMsg struct {
 	result deleter.Result
 }
 
+type titleAnimationTickMsg struct{}
+
+const (
+	titleText              = "repomop"
+	titleAnimationPadding  = 2
+	titleAnimationInterval = 90 * time.Millisecond
+)
+
 // Model is the Bubble Tea application state.
 type Model struct {
 	opts   scanner.ScanOptions
@@ -76,6 +85,8 @@ type Model struct {
 	message  string
 	fatalErr error
 
+	titleAnimationFrame int
+
 	width  int
 	height int
 }
@@ -99,7 +110,11 @@ func NewModel(opts scanner.ScanOptions) Model {
 
 // Init starts spinner ticks and asynchronous scanning.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, scanArtifactsCmd(m.ctx, m.opts))
+	return tea.Batch(
+		m.spinner.Tick,
+		scanArtifactsCmd(m.ctx, m.opts),
+		tickTitleAnimation(),
+	)
 }
 
 // Update handles keyboard input and async scan/delete messages.
@@ -110,6 +125,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = typed.Width
 		m.height = typed.Height
+	case titleAnimationTickMsg:
+		if m.state != stateLoading {
+			return m, nil
+		}
+		m.titleAnimationFrame = (m.titleAnimationFrame + 1) % titleAnimationCycleLength()
+		cmds = append(cmds, tickTitleAnimation())
 	case scanFinishedMsg:
 		if typed.err != nil {
 			m.state = stateError
@@ -293,6 +314,16 @@ func deleteArtifactsCmd(ctx context.Context, artifacts []scanner.Artifact) tea.C
 		result := deleter.Artifacts(ctx, artifacts)
 		return deleteFinishedMsg{result: result}
 	}
+}
+
+func tickTitleAnimation() tea.Cmd {
+	return tea.Tick(titleAnimationInterval, func(time.Time) tea.Msg {
+		return titleAnimationTickMsg{}
+	})
+}
+
+func titleAnimationCycleLength() int {
+	return len([]rune(titleText)) + (titleAnimationPadding * 2)
 }
 
 // FatalError returns the terminal error for a failed TUI session.

@@ -58,11 +58,40 @@ func (m Model) View() string {
 func (m Model) renderLoadingView() string {
 	body := fmt.Sprintf("%s Scanning directories and calculating sizes...", m.spinner.View())
 	return strings.Join([]string{
-		titleStyle.Render("repomop"),
+		m.renderLoadingTitle(),
 		"",
 		body,
 		dimStyle.Render("Press q to quit."),
 	}, "\n")
+}
+
+func (m Model) renderLoadingTitle() string {
+	runes := []rune(titleText)
+	waveCenter := (m.titleAnimationFrame % titleAnimationCycleLength()) - titleAnimationPadding
+
+	var b strings.Builder
+	b.Grow(len(titleText) * 8)
+
+	for idx, r := range runes {
+		distance := idx - waveCenter
+		if distance < 0 {
+			distance = -distance
+		}
+
+		color := lipgloss.Color("245")
+		switch distance {
+		case 0:
+			color = lipgloss.Color("255")
+		case 1:
+			color = lipgloss.Color("252")
+		case 2:
+			color = lipgloss.Color("249")
+		}
+
+		b.WriteString(titleStyle.Foreground(color).Render(string(r)))
+	}
+
+	return b.String()
 }
 
 func (m Model) renderListView() string {

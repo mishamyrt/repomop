@@ -430,6 +430,44 @@ func TestScanFinishedWithWarnings(t *testing.T) {
 	}
 }
 
+func TestTitleAnimationTickAdvancesInLoadingState(t *testing.T) {
+	m := newTestModel(stateLoading, nil, nil)
+
+	updated, cmd := m.Update(titleAnimationTickMsg{})
+	got := updated.(Model)
+	if got.titleAnimationFrame != 1 {
+		t.Fatalf("expected title animation frame 1, got %d", got.titleAnimationFrame)
+	}
+	if cmd == nil {
+		t.Fatal("expected next animation tick command")
+	}
+}
+
+func TestTitleAnimationTickWrapsCycle(t *testing.T) {
+	m := newTestModel(stateLoading, nil, nil)
+	m.titleAnimationFrame = titleAnimationCycleLength() - 1
+
+	updated, _ := m.Update(titleAnimationTickMsg{})
+	got := updated.(Model)
+	if got.titleAnimationFrame != 0 {
+		t.Fatalf("expected wrapped animation frame 0, got %d", got.titleAnimationFrame)
+	}
+}
+
+func TestTitleAnimationTickStopsOutsideLoadingState(t *testing.T) {
+	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
+	m.titleAnimationFrame = 3
+
+	updated, cmd := m.Update(titleAnimationTickMsg{})
+	got := updated.(Model)
+	if got.titleAnimationFrame != 3 {
+		t.Fatalf("expected title animation frame to remain 3, got %d", got.titleAnimationFrame)
+	}
+	if cmd != nil {
+		t.Fatal("expected no animation command outside loading state")
+	}
+}
+
 // --- deleteFinishedMsg ---
 
 func TestDeleteFinishedSuccess(t *testing.T) {
@@ -548,6 +586,15 @@ func TestInitReturnsCmd(t *testing.T) {
 	cmd := m.Init()
 	if cmd == nil {
 		t.Fatal("expected Init to return a command")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected tea.BatchMsg, got %T", msg)
+	}
+	if len(batch) != 3 {
+		t.Fatalf("expected 3 init commands, got %d", len(batch))
 	}
 }
 

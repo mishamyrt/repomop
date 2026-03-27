@@ -191,6 +191,17 @@ func TestViewLoading(t *testing.T) {
 	}
 }
 
+func TestViewLoadingKeepsAnimatedTitleReadable(t *testing.T) {
+	m := NewModel(scanner.ScanOptions{RootPath: "/test"})
+	m.state = stateLoading
+	m.titleAnimationFrame = 4
+
+	output := stripANSI(m.View())
+	if !strings.Contains(output, "repomop") {
+		t.Fatalf("expected animated title text to remain readable, got:\n%s", output)
+	}
+}
+
 func TestViewError(t *testing.T) {
 	m := Model{state: stateError, message: "something broke"}
 	output := stripANSI(m.View())
