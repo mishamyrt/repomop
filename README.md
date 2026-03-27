@@ -33,6 +33,9 @@ Developers accumulate projects over time. Each one carries build artifacts and d
 | JavaScript / Node.js | `node_modules` (with pnpm hard links handling) |
 | Rust | `target` |
 | Swift (SPM) | `.build` |
+| Elixir | `_build`, `deps` |
+| Haskell | `.stack-work`, `dist-newstyle` |
+| Terraform | `.terraform` |
 | Python | virtualenvs (any directory name) |
 | Java / Kotlin (Gradle) | `.gradle`, `build`, `out` |
 | Java (Maven) | `target` |
@@ -43,7 +46,7 @@ Developers accumulate projects over time. Each one carries build artifacts and d
 | Zig | `zig-out`, `.zig-cache` |
 | PlatformIO | `.pio` |
 
-Each rule is tied to a project marker file (e.g. `Cargo.toml` for Rust, `package.json` for Node.js), so random directories with the same name won't be misidentified.
+Each rule is tied to a project marker file or file pattern (e.g. `Cargo.toml` for Rust, `*.tf` for Terraform), so random directories with the same name won't be misidentified.
 
 ## Installation
 

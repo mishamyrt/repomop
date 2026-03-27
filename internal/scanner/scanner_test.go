@@ -82,6 +82,113 @@ func TestScanSwiftBuildRequiresPackageSwift(t *testing.T) {
 	}
 }
 
+func TestScanElixirArtifacts(t *testing.T) {
+	root := t.TempDir()
+
+	project := filepath.Join(root, "elixir")
+	testutil.MkdirAll(t, filepath.Join(project, "_build"))
+	testutil.MkdirAll(t, filepath.Join(project, "deps"))
+	testutil.WriteFile(t, filepath.Join(project, "mix.exs"), "defmodule Sample.MixProject do end")
+
+	orphan := filepath.Join(root, "orphan")
+	testutil.MkdirAll(t, filepath.Join(orphan, "_build"))
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+
+	for _, artifactPath := range []string{
+		filepath.Join(project, "_build"),
+		filepath.Join(project, "deps"),
+	} {
+		artifact, ok := artifactAtPath(artifacts, artifactPath)
+		if !ok {
+			t.Fatalf("expected elixir artifact %s", artifactPath)
+		}
+		if artifact.Kind != ArtifactElixir {
+			t.Fatalf("expected elixir kind, got %s", artifact.Kind)
+		}
+		if artifact.ProjectRoot != project {
+			t.Fatalf("unexpected elixir project root: %s", artifact.ProjectRoot)
+		}
+	}
+
+	if _, ok := artifactAtPath(artifacts, filepath.Join(orphan, "_build")); ok {
+		t.Fatalf("unexpected orphan elixir _build artifact")
+	}
+}
+
+func TestScanHaskellArtifacts(t *testing.T) {
+	root := t.TempDir()
+
+	stackProject := filepath.Join(root, "stack-app")
+	testutil.MkdirAll(t, filepath.Join(stackProject, ".stack-work"))
+	testutil.WriteFile(t, filepath.Join(stackProject, "stack.yaml"), "resolver: lts-22.0")
+	testutil.WriteFile(t, filepath.Join(stackProject, "stack-app.cabal"), "name: stack-app")
+
+	cabalProject := filepath.Join(root, "cabal-app")
+	testutil.MkdirAll(t, filepath.Join(cabalProject, "dist-newstyle"))
+	testutil.WriteFile(t, filepath.Join(cabalProject, "cabal-app.cabal"), "name: cabal-app")
+
+	orphan := filepath.Join(root, "orphan")
+	testutil.MkdirAll(t, filepath.Join(orphan, "dist-newstyle"))
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+
+	stackArtifact, ok := artifactAtPath(artifacts, filepath.Join(stackProject, ".stack-work"))
+	if !ok {
+		t.Fatalf("expected stack work artifact")
+	}
+	if stackArtifact.Kind != ArtifactHaskell {
+		t.Fatalf("expected haskell kind, got %s", stackArtifact.Kind)
+	}
+	if stackArtifact.ProjectRoot != stackProject {
+		t.Fatalf("unexpected stack project root: %s", stackArtifact.ProjectRoot)
+	}
+
+	cabalArtifact, ok := artifactAtPath(artifacts, filepath.Join(cabalProject, "dist-newstyle"))
+	if !ok {
+		t.Fatalf("expected dist-newstyle artifact")
+	}
+	if cabalArtifact.Kind != ArtifactHaskell {
+		t.Fatalf("expected haskell kind, got %s", cabalArtifact.Kind)
+	}
+	if cabalArtifact.ProjectRoot != cabalProject {
+		t.Fatalf("unexpected cabal project root: %s", cabalArtifact.ProjectRoot)
+	}
+
+	if _, ok := artifactAtPath(artifacts, filepath.Join(orphan, "dist-newstyle")); ok {
+		t.Fatalf("unexpected orphan dist-newstyle artifact")
+	}
+}
+
+func TestScanTerraformArtifactRequiresTerraformConfig(t *testing.T) {
+	root := t.TempDir()
+
+	project := filepath.Join(root, "infra")
+	testutil.MkdirAll(t, filepath.Join(project, ".terraform"))
+	testutil.WriteFile(t, filepath.Join(project, "main.tf"), "terraform {}")
+
+	orphan := filepath.Join(root, "orphan")
+	testutil.MkdirAll(t, filepath.Join(orphan, ".terraform"))
+	testutil.MkdirAll(t, filepath.Join(orphan, "main.tf"))
+
+	artifacts := mustScan(t, ScanOptions{RootPath: root, MaxDepth: -1})
+
+	artifact, ok := artifactAtPath(artifacts, filepath.Join(project, ".terraform"))
+	if !ok {
+		t.Fatalf("expected terraform artifact")
+	}
+	if artifact.Kind != ArtifactTerraform {
+		t.Fatalf("expected terraform kind, got %s", artifact.Kind)
+	}
+	if artifact.ProjectRoot != project {
+		t.Fatalf("unexpected terraform project root: %s", artifact.ProjectRoot)
+	}
+
+	if _, ok := artifactAtPath(artifacts, filepath.Join(orphan, ".terraform")); ok {
+		t.Fatalf("unexpected orphan terraform artifact")
+	}
+}
+
 func TestScanGradleArtifacts(t *testing.T) {
 	root := t.TempDir()
 
@@ -615,6 +722,22 @@ func TestFindNearestAncestorNoMarker(t *testing.T) {
 	_, ok := findNearestAncestorWithMarker(ctx, nested, []string{"nonexistent.marker"})
 	if ok {
 		t.Fatal("expected no match")
+	}
+}
+
+func TestFindNearestAncestorWithGlobMarker(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "terraform")
+	testutil.MkdirAll(t, project)
+	testutil.WriteFile(t, filepath.Join(project, "providers.tf"), "terraform {}")
+
+	ctx := newScanContext(root)
+	markerRoot, ok := findNearestAncestorWithMarker(ctx, project, []string{"*.tf"})
+	if !ok {
+		t.Fatal("expected glob marker match")
+	}
+	if markerRoot != project {
+		t.Fatalf("expected project root %s, got %s", project, markerRoot)
 	}
 }
 

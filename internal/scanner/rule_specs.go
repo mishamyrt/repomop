@@ -18,12 +18,20 @@ type artifactRule struct {
 }
 
 var gradleMarkers = []string{"settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"}
+var haskellStackMarkers = []string{"stack.yaml", "*.cabal"}
+var haskellCabalMarkers = []string{"*.cabal", "cabal.project"}
+var terraformMarkers = []string{"*.tf", "*.tf.json", ".terraform.lock.hcl"}
 
 var defaultArtifactRules = []artifactRule{
 	namedDirRule(ArtifactNodeModule, "node_modules", []string{"package.json"}),
 	namedDirRule(ArtifactRustTarget, "target", []string{"Cargo.toml"}),
 	namedDirRule(ArtifactJavaMaven, "target", []string{"pom.xml"}),
 	namedDirRule(ArtifactSwiftBuild, ".build", []string{"Package.swift"}),
+	namedDirRule(ArtifactElixir, "_build", []string{"mix.exs"}),
+	namedDirRule(ArtifactElixir, "deps", []string{"mix.exs"}),
+	namedDirRule(ArtifactHaskell, ".stack-work", haskellStackMarkers),
+	namedDirRule(ArtifactHaskell, "dist-newstyle", haskellCabalMarkers),
+	namedDirRule(ArtifactTerraform, ".terraform", terraformMarkers),
 
 	namedDirRule(ArtifactJavaGradle, ".gradle", gradleMarkers),
 	namedDirRule(ArtifactJavaGradle, "build", gradleMarkers),

@@ -14,6 +14,9 @@ const (
 	ArtifactNodeModule
 	ArtifactRustTarget
 	ArtifactSwiftBuild
+	ArtifactElixir
+	ArtifactHaskell
+	ArtifactTerraform
 	ArtifactJavaGradle
 	ArtifactJavaMaven
 	ArtifactCMake
@@ -29,6 +32,9 @@ var artifactKindNames = [...]string{
 	ArtifactNodeModule: "node-modules",
 	ArtifactRustTarget: "rust-target",
 	ArtifactSwiftBuild: "swift-build",
+	ArtifactElixir:     "elixir",
+	ArtifactHaskell:    "haskell",
+	ArtifactTerraform:  "terraform",
 	ArtifactJavaGradle: "java-gradle",
 	ArtifactJavaMaven:  "java-maven",
 	ArtifactCMake:      "cmake",
