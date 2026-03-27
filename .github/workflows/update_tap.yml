@@ -41,7 +41,7 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           cat > Formula/repomop.rb << 'FORMULA'
-          class RepoMop < Formula
+          class Repomop < Formula
             desc "Project artifacts cleaner"
             homepage "https://github.com/mishamyrt/repomop"
             license "MIT"
