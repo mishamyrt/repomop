@@ -22,12 +22,9 @@ type jobResult struct {
 // RecommendedWorkerCount returns a bounded worker count for responsive scans.
 func RecommendedWorkerCount() int {
 	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > 8 {
-		workers = 8
-	}
+	workers = min(workers, 8)
+	workers = max(workers, 1)
+
 	return workers
 }
 
