@@ -79,6 +79,7 @@ impl App {
                     if selected.is_empty() {
                         self.state = ViewState::List;
                     } else {
+                        self.delete_spinner_index = 0;
                         self.message.clear();
                         self.state = ViewState::Deleting;
                         self.spawn_delete(selected);

@@ -47,13 +47,16 @@ pub fn delete_artifacts(artifacts: &[Artifact]) -> DeleteResult {
                         break;
                     };
                     let outcome = match fs::remove_dir_all(&artifact.path) {
-                        Ok(()) => DeletionOutcome::Deleted { artifact: artifact.clone() },
+                        Ok(()) => {
+                            DeletionOutcome::Deleted { artifact: artifact.clone() }
+                        }
                         Err(err) if err.kind() == io::ErrorKind::NotFound => {
                             DeletionOutcome::Missing { artifact: artifact.clone() }
                         }
-                        Err(error) => {
-                            DeletionOutcome::Failed { artifact: artifact.clone(), error }
-                        }
+                        Err(error) => DeletionOutcome::Failed {
+                            artifact: artifact.clone(),
+                            error,
+                        },
                     };
                     if sender.send(outcome).is_err() {
                         break;

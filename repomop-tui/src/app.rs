@@ -6,6 +6,8 @@ use repomop_core::{Artifact, ScanOptions, sort_artifacts_by_size_desc};
 use repomop_fs::{DeleteResult, delete_artifacts};
 use repomop_scanner::scan_and_measure;
 
+use crate::widgets::{DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT};
+
 #[derive(Debug, Clone, Default)]
 pub struct SessionResult {
     pub fatal_error: Option<String>,
@@ -41,7 +43,8 @@ pub(crate) struct App {
     pub(crate) delete_result: DeleteResult,
     pub(crate) message: String,
     pub(crate) fatal_error: Option<String>,
-    pub(crate) spinner_index: usize,
+    pub(crate) scan_spinner_index: usize,
+    pub(crate) delete_spinner_index: usize,
     pub(crate) should_quit: bool,
     /// Set when the scan found zero artifacts (avoids fragile string comparison).
     pub(crate) no_artifacts_found: bool,
@@ -64,7 +67,8 @@ impl App {
             delete_result: DeleteResult::default(),
             message: String::new(),
             fatal_error: None,
-            spinner_index: 0,
+            scan_spinner_index: 0,
+            delete_spinner_index: 0,
             should_quit: false,
             no_artifacts_found: false,
             background_rx,
@@ -133,8 +137,19 @@ impl App {
     }
 
     pub(crate) fn tick(&mut self) {
-        if matches!(self.state, ViewState::Loading | ViewState::Deleting) {
-            self.spinner_index = (self.spinner_index + 1) % 4;
+        match self.state {
+            ViewState::Loading => {
+                self.scan_spinner_index =
+                    (self.scan_spinner_index + 1) % SCAN_SPINNER_FRAME_COUNT;
+            }
+            ViewState::Deleting => {
+                self.delete_spinner_index =
+                    (self.delete_spinner_index + 1) % DELETE_SPINNER_FRAME_COUNT;
+            }
+            ViewState::List
+            | ViewState::Confirm
+            | ViewState::Done
+            | ViewState::Error => {}
         }
     }
 

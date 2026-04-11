@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::Text;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use ratatui::text::Text;
 
 use repomop_core::{Artifact, format_bytes};
 
@@ -37,9 +37,29 @@ pub(crate) fn styled_line<T: Into<String>>(
     Line::from(Span::styled(text.into(), style))
 }
 
-pub(crate) fn spinner(index: usize) -> &'static str {
-    const FRAMES: &[&str] = &["⠁", "⠂", "⠄", "⠂"];
-    FRAMES[index % FRAMES.len()]
+const SCAN_SPINNER_FRAMES: [&str; 10] =
+    ["⠀⠀⠀⠀", "⡇⠀⠀⠀", "⣿⠀⠀⠀", "⢸⡇⠀⠀", "⠀⣿⠀⠀", "⠀⢸⡇⠀", "⠀⠀⣿⠀", "⠀⠀⢸⡇", "⠀⠀⠀⣿", "⠀⠀⠀⢸"];
+const DELETE_SPINNER_FRAMES: [&str; 16] = [
+    "⠁⠀", "⠋⠀", "⠟⠁", "⡿⠋", "⣿⠟", "⣿⡿", "⣿⣿", "⣿⣿", "⣾⣿", "⣴⣿", "⣠⣾", "⢀⣴", "⠀⣠",
+    "⠀⢀", "⠀⠀", "⠀⠀",
+];
+
+pub(crate) const SCAN_SPINNER_FRAME_COUNT: usize = SCAN_SPINNER_FRAMES.len();
+pub(crate) const DELETE_SPINNER_FRAME_COUNT: usize = DELETE_SPINNER_FRAMES.len();
+
+fn spinner_frame<const N: usize>(
+    frames: &[&'static str; N],
+    index: usize,
+) -> &'static str {
+    frames[index % N]
+}
+
+pub(crate) fn scan_spinner(index: usize) -> &'static str {
+    spinner_frame(&SCAN_SPINNER_FRAMES, index)
+}
+
+pub(crate) fn delete_spinner(index: usize) -> &'static str {
+    spinner_frame(&DELETE_SPINNER_FRAMES, index)
 }
 
 pub(crate) fn focus_style(style: Style, focused: bool) -> Style {
@@ -155,7 +175,14 @@ pub(crate) fn truncate_path_left(path: &str, max_width: usize) -> String {
     }
 
     let remaining = max_width - prefix.chars().count();
-    let tail: String = path.chars().rev().take(remaining).collect::<Vec<_>>().into_iter().rev().collect();
+    let tail: String = path
+        .chars()
+        .rev()
+        .take(remaining)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     format!("{prefix}{tail}")
 }
 
@@ -168,7 +195,10 @@ pub(crate) fn display_relative(root: &Path, path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{truncate_path_left, visible_range_for};
+    use super::{
+        DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT, delete_spinner,
+        scan_spinner, truncate_path_left, visible_range_for,
+    };
 
     #[test]
     fn truncate_keeps_short_paths() {
@@ -187,5 +217,15 @@ mod tests {
         let (start, end) = visible_range_for(20, 0, 5, 6, 5);
         assert_eq!(start, 0);
         assert_eq!(end - start, 5);
+    }
+
+    #[test]
+    fn scan_spinner_wraps_to_first_frame() {
+        assert_eq!(scan_spinner(0), scan_spinner(SCAN_SPINNER_FRAME_COUNT));
+    }
+
+    #[test]
+    fn delete_spinner_wraps_to_first_frame() {
+        assert_eq!(delete_spinner(0), delete_spinner(DELETE_SPINNER_FRAME_COUNT));
     }
 }

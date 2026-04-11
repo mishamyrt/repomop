@@ -1,17 +1,17 @@
 use std::collections::BTreeSet;
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::Frame;
 
 use repomop_core::format_bytes;
 
 use crate::app::{App, ViewState};
 use crate::widgets::{
     CONFIRM_CHROME_LINES, CONFIRM_MIN_VISIBLE, LIST_CHROME_LINES, LIST_MIN_VISIBLE,
-    artifact_span, compute_size_column_width, display_relative, focus_style,
-    paragraph, path_column_width, spinner, styled_line,
+    artifact_span, compute_size_column_width, delete_spinner, display_relative,
+    focus_style, paragraph, path_column_width, scan_spinner, styled_line,
     truncate_path_left, visible_range_for, visible_range_from_offset,
 };
 
@@ -34,9 +34,9 @@ impl App {
             Line::raw(""),
             Line::raw(format!(
                 "{} Scanning directories and calculating sizes...",
-                spinner(self.spinner_index)
+                scan_spinner(self.scan_spinner_index)
             )),
-            Line::raw("Press q to quit."),
+            styled_line("Press q to quit.", Color::DarkGray, false),
         ]);
         frame.render_widget(paragraph(text), area);
     }
@@ -126,8 +126,7 @@ impl App {
             CONFIRM_MIN_VISIBLE,
         );
         for artifact in &selected[start..end] {
-            let relative =
-                display_relative(&self.opts.root_path, &artifact.path);
+            let relative = display_relative(&self.opts.root_path, &artifact.path);
             let size = format!("({})", format_bytes(artifact.size_bytes));
             let width = area.width as usize;
             let path_width = width.saturating_sub(size.len() + 3).max(1);
@@ -143,7 +142,7 @@ impl App {
         }
 
         lines.push(Line::raw(""));
-        lines.push(Line::raw("Press Y to delete, or N to cancel: [y/N]"));
+        lines.push(Line::raw("Press Y to delete"));
         lines.push(styled_line(
             "↑↓ Review items | y delete | n/esc cancel | q quit",
             Color::DarkGray,
@@ -159,7 +158,7 @@ impl App {
             Line::raw(""),
             Line::raw(format!(
                 "{} Removing selected artifacts...",
-                spinner(self.spinner_index)
+                delete_spinner(self.delete_spinner_index)
             )),
         ]);
         frame.render_widget(paragraph(text), area);
@@ -207,10 +206,7 @@ impl App {
                 lines.push(styled_line(
                     format!(
                         "- {}: {}",
-                        display_relative(
-                            &self.opts.root_path,
-                            &item.artifact.path,
-                        ),
+                        display_relative(&self.opts.root_path, &item.artifact.path,),
                         item.error
                     ),
                     Color::Red,
@@ -266,14 +262,17 @@ impl App {
             width = size_width
         );
         let kind = artifact.kind.to_string();
-        let relative =
-            display_relative(&self.opts.root_path, &artifact.path);
+        let relative = display_relative(&self.opts.root_path, &artifact.path);
         let path_width = path_column_width(width, size_width, kind.len());
         let path = truncate_path_left(&relative, path_width);
 
         Line::from(vec![
             span_focus(bar.to_string(), focused),
-            span_focus_colored(marker.to_string(), marker_color(index, &self.selected), focused),
+            span_focus_colored(
+                marker.to_string(),
+                marker_color(index, &self.selected),
+                focused,
+            ),
             span_focus("  ".to_string(), focused),
             artifact_span(size, Color::Cyan, focused),
             span_focus("  ".to_string(), focused),
