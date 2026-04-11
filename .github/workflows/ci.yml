@@ -22,7 +22,7 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: llvm-tools-preview
+          components: clippy
 
       - name: Run lint
         run: make lint
@@ -36,15 +36,13 @@ jobs:
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: llvm-tools-preview
 
       - name: Run tests
         run: make test
 
   build-matrix:
-    name: Build (${{ matrix.goos }}-${{ matrix.goarch }})
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs:
       - lint
       - test
@@ -52,14 +50,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - goos: darwin
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
+          - os: darwin
+            arch: arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+          - os: darwin
+            arch: amd64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: linux
+            arch: amd64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -67,17 +73,21 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: llvm-tools-preview
+          target: ${{ matrix.target }}
 
       - name: Build binary
+        env:
+          OS: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
         run: |
-          mkdir -p "dist/repomop_${GOOS}_${GOARCH}"
-          cargo build --release
-          cp target/release/repomop "dist/repomop_${GOOS}_${GOARCH}/repomop"
+          mkdir -p "dist/repomop_${OS}_${ARCH}"
+          cargo build --release --locked --package repomop --target "${TARGET}"
+          cp "target/${TARGET}/release/repomop" "dist/repomop_${OS}_${ARCH}/repomop"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: repomop_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: dist/repomop_${{ matrix.goos }}_${{ matrix.goarch }}/repomop
+          name: repomop_${{ matrix.os }}_${{ matrix.arch }}
+          path: dist/repomop_${{ matrix.os }}_${{ matrix.arch }}/repomop
           if-no-files-found: error

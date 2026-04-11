@@ -1,39 +1,42 @@
 name: Update Homebrew Tap
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
 
 jobs:
   update-tap:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
     steps:
       - name: Compute SHA256
         id: sha
         env:
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          BASE="https://github.com/mishamyrt/repomop/releases/download/${TAG}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
           ARM_URL="${BASE}/repomop_darwin_arm64.tar.gz"
           AMD_URL="${BASE}/repomop_darwin_amd64.tar.gz"
-          ARM_SHA=$(curl -sL "$ARM_URL" | shasum -a 256 | awk '{print $1}')
-          AMD_SHA=$(curl -sL "$AMD_URL" | shasum -a 256 | awk '{print $1}')
+          ARM_SHA=$(curl -fsSL "$ARM_URL" | shasum -a 256 | awk '{print $1}')
+          AMD_SHA=$(curl -fsSL "$AMD_URL" | shasum -a 256 | awk '{print $1}')
           echo "arm_sha256=$ARM_SHA" >> "$GITHUB_OUTPUT"
           echo "arm_url=$ARM_URL" >> "$GITHUB_OUTPUT"
           echo "amd_sha256=$AMD_SHA" >> "$GITHUB_OUTPUT"
           echo "amd_url=$AMD_URL" >> "$GITHUB_OUTPUT"
 
       - name: Checkout tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          repository: mishamyrt/homebrew-lidoff
+          repository: mishamyrt/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
       - name: Update formula
         env:
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          TAG: ${{ github.event.release.tag_name }}
           ARM_SHA256: ${{ steps.sha.outputs.arm_sha256 }}
           ARM_URL: ${{ steps.sha.outputs.arm_url }}
           AMD_SHA256: ${{ steps.sha.outputs.amd_sha256 }}
@@ -45,6 +48,7 @@ jobs:
             desc "Project artifacts cleaner"
             homepage "https://github.com/mishamyrt/repomop"
             license "MIT"
+            version "VERSION_PLACEHOLDER"
 
             depends_on :macos
 
@@ -74,7 +78,7 @@ jobs:
 
       - name: Commit and push
         env:
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
