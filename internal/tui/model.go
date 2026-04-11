@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 
 	deleter "repomop/internal/delete"
 	"repomop/internal/scanner"
@@ -25,7 +25,7 @@ type keyMap struct {
 var keys = keyMap{
 	Up:     key.NewBinding(key.WithKeys("up", "k")),
 	Down:   key.NewBinding(key.WithKeys("down", "j")),
-	Toggle: key.NewBinding(key.WithKeys(" ")),
+	Toggle: key.NewBinding(key.WithKeys("space")),
 	Enter:  key.NewBinding(key.WithKeys("enter")),
 	Yes:    key.NewBinding(key.WithKeys("y")),
 	No:     key.NewBinding(key.WithKeys("n")),
@@ -94,7 +94,21 @@ type Model struct {
 // NewModel creates a new TUI model.
 func NewModel(opts scanner.ScanOptions) Model {
 	spin := spinner.New()
-	spin.Spinner = spinner.Dot
+	spin.Spinner = spinner.Spinner{
+		Frames: []string{
+			"⠀⠀⠀⠀",
+			"⡇⠀⠀⠀",
+			"⣿⠀⠀⠀",
+			"⢸⡇⠀⠀",
+			"⠀⣿⠀⠀",
+			"⠀⢸⡇⠀",
+			"⠀⠀⣿⠀",
+			"⠀⠀⢸⡇",
+			"⠀⠀⠀⣿",
+			"⠀⠀⠀⢸",
+		},
+		FPS: time.Second / 10, //nolint:mnd
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return Model{
@@ -164,7 +178,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = "Selected artifacts were removed."
 		}
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch m.state {
 		case stateLoading:
 			if key.Matches(typed, keys.Quit) {
@@ -213,7 +227,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case stateConfirm:
 			selected := m.confirmArtifacts()
 			switch {
-			case typed.Type == tea.KeyEsc:
+			case typed.String() == "esc":
 				m.cachedSelection = nil
 				m.confirmOffset = 0
 				m.state = stateList

@@ -6,7 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 
 	"repomop/internal/format"
 	"repomop/internal/pathutil"
@@ -26,9 +28,9 @@ var (
 	focusBarStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	idleBarStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 	sizeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	pathStyle           = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
-		Light: "0",
-		Dark:  "7",
+	pathStyle           = lipgloss.NewStyle().Foreground(compat.AdaptiveColor{
+		Light: lipgloss.Color("0"),
+		Dark:  lipgloss.Color("7"),
 	})
 	kindStyle       = lipgloss.NewStyle().Faint(true)
 	focusedRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
@@ -36,23 +38,29 @@ var (
 )
 
 // View renders the current TUI screen.
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	switch m.state {
 	case stateLoading:
-		return m.renderLoadingView()
+		return newAltScreenView(m.renderLoadingView())
 	case stateList:
-		return m.renderListView()
+		return newAltScreenView(m.renderListView())
 	case stateConfirm:
-		return m.renderConfirmView()
+		return newAltScreenView(m.renderConfirmView())
 	case stateDeleting:
-		return m.renderDeletingView()
+		return newAltScreenView(m.renderDeletingView())
 	case stateError:
-		return m.renderErrorView()
+		return newAltScreenView(m.renderErrorView())
 	case stateDone:
-		return m.renderDoneView()
+		return newAltScreenView(m.renderDoneView())
 	default:
-		return ""
+		return newAltScreenView("")
 	}
+}
+
+func newAltScreenView(content string) tea.View {
+	view := tea.NewView(content)
+	view.AltScreen = true
+	return view
 }
 
 func (m Model) renderLoadingView() string {

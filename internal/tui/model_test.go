@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	deleter "repomop/internal/delete"
 	"repomop/internal/scanner"
@@ -42,11 +42,34 @@ var sampleArtifacts = []scanner.Artifact{
 	{Kind: scanner.ArtifactPythonVenv, Path: "/repo/.venv", SizeBytes: 512},
 }
 
+func press(key string) tea.KeyPressMsg {
+	switch key {
+	case "esc":
+		return tea.KeyPressMsg{Code: tea.KeyEsc}
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
+	case "down":
+		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "ctrl+c":
+		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+	case "space":
+		return tea.KeyPressMsg{Code: ' ', Text: " "}
+	default:
+		runes := []rune(key)
+		if len(runes) != 1 {
+			panic("unsupported test key: " + key)
+		}
+		return tea.KeyPressMsg{Code: runes[0], Text: key}
+	}
+}
+
 // --- Loading state ---
 
 func TestLoadingEscQuits(t *testing.T) {
 	m := newTestModel(stateLoading, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	_, cmd := m.Update(press("esc"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -57,7 +80,7 @@ func TestLoadingEscQuits(t *testing.T) {
 
 func TestLoadingQKeyQuits(t *testing.T) {
 	m := newTestModel(stateLoading, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	_, cmd := m.Update(press("q"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -65,7 +88,7 @@ func TestLoadingQKeyQuits(t *testing.T) {
 
 func TestLoadingCtrlCQuits(t *testing.T) {
 	m := newTestModel(stateLoading, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	_, cmd := m.Update(press("ctrl+c"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -75,7 +98,7 @@ func TestLoadingCtrlCQuits(t *testing.T) {
 
 func TestListViewEscQuits(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	_, cmd := m.Update(press("esc"))
 	if cmd == nil {
 		t.Fatal("expected quit command on esc key")
 	}
@@ -86,7 +109,7 @@ func TestListViewEscQuits(t *testing.T) {
 
 func TestConfirmViewEscReturnsToList(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, cmd := m.Update(press("esc"))
 	got := updated.(Model)
 	if got.state != stateList {
 		t.Fatalf("expected stateList, got %v", got.state)
@@ -100,7 +123,7 @@ func TestListViewEnterWithoutSelectionDoesNotSetHint(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.message = "Some artifact sizes could not be fully calculated."
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.Update(press("enter"))
 	got := updated.(Model)
 	if got.state != stateList {
 		t.Fatalf("expected stateList, got %v", got.state)
@@ -113,7 +136,7 @@ func TestListViewEnterWithoutSelectionDoesNotSetHint(t *testing.T) {
 func TestListViewCursorUp(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 2
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	updated, _ := m.Update(press("up"))
 	got := updated.(Model)
 	if got.cursor != 1 {
 		t.Fatalf("expected cursor 1, got %d", got.cursor)
@@ -123,7 +146,7 @@ func TestListViewCursorUp(t *testing.T) {
 func TestListViewCursorUpAtZero(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	updated, _ := m.Update(press("up"))
 	got := updated.(Model)
 	if got.cursor != 0 {
 		t.Fatalf("expected cursor 0, got %d", got.cursor)
@@ -133,7 +156,7 @@ func TestListViewCursorUpAtZero(t *testing.T) {
 func TestListViewCursorDown(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ := m.Update(press("down"))
 	got := updated.(Model)
 	if got.cursor != 1 {
 		t.Fatalf("expected cursor 1, got %d", got.cursor)
@@ -143,7 +166,7 @@ func TestListViewCursorDown(t *testing.T) {
 func TestListViewCursorDownAtEnd(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = len(sampleArtifacts) - 1
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ := m.Update(press("down"))
 	got := updated.(Model)
 	if got.cursor != len(sampleArtifacts)-1 {
 		t.Fatalf("expected cursor at end, got %d", got.cursor)
@@ -153,7 +176,7 @@ func TestListViewCursorDownAtEnd(t *testing.T) {
 func TestListViewCursorK(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 1
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	updated, _ := m.Update(press("k"))
 	got := updated.(Model)
 	if got.cursor != 0 {
 		t.Fatalf("expected cursor 0, got %d", got.cursor)
@@ -163,7 +186,7 @@ func TestListViewCursorK(t *testing.T) {
 func TestListViewCursorJ(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 0
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	updated, _ := m.Update(press("j"))
 	got := updated.(Model)
 	if got.cursor != 1 {
 		t.Fatalf("expected cursor 1, got %d", got.cursor)
@@ -174,7 +197,7 @@ func TestListViewSpaceTogglesSelection(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
 	m.cursor = 1
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	updated, _ := m.Update(press("space"))
 	got := updated.(Model)
 	if _, ok := got.selected[1]; !ok {
 		t.Fatal("expected item 1 to be selected")
@@ -186,7 +209,7 @@ func TestListViewSpaceTogglesSelection(t *testing.T) {
 		t.Fatalf("expected selectedSize %d, got %d", sampleArtifacts[1].SizeBytes, got.selectedSize)
 	}
 
-	updated2, _ := got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	updated2, _ := got.Update(press("space"))
 	got2 := updated2.(Model)
 	if _, ok := got2.selected[1]; ok {
 		t.Fatal("expected item 1 to be deselected")
@@ -202,7 +225,7 @@ func TestListViewSpaceTogglesSelection(t *testing.T) {
 func TestListViewEnterWithSelectionGoesToConfirm(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{0: {}})
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.Update(press("enter"))
 	got := updated.(Model)
 	if got.state != stateConfirm {
 		t.Fatalf("expected stateConfirm, got %v", got.state)
@@ -211,7 +234,7 @@ func TestListViewEnterWithSelectionGoesToConfirm(t *testing.T) {
 
 func TestListViewQQuits(t *testing.T) {
 	m := newTestModel(stateList, sampleArtifacts, map[int]struct{}{})
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	_, cmd := m.Update(press("q"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -222,7 +245,7 @@ func TestListViewQQuits(t *testing.T) {
 func TestConfirmYProceeds(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	updated, cmd := m.Update(press("y"))
 	got := updated.(Model)
 	if got.state != stateDeleting {
 		t.Fatalf("expected stateDeleting, got %v", got.state)
@@ -235,7 +258,7 @@ func TestConfirmYProceeds(t *testing.T) {
 func TestConfirmNReturnsToList(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	updated, _ := m.Update(press("n"))
 	got := updated.(Model)
 	if got.state != stateList {
 		t.Fatalf("expected stateList, got %v", got.state)
@@ -245,7 +268,7 @@ func TestConfirmNReturnsToList(t *testing.T) {
 func TestConfirmEnterDoesNothing(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(press("enter"))
 	got := updated.(Model)
 	if got.state != stateConfirm {
 		t.Fatalf("expected stateConfirm, got %v", got.state)
@@ -267,7 +290,7 @@ func TestConfirmCursorDown(t *testing.T) {
 	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}, 4: {}, 5: {}})
 	m.height = 13
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ := m.Update(press("down"))
 	got := updated.(Model)
 	if got.confirmOffset != 1 {
 		t.Fatalf("expected confirmOffset 1, got %d", got.confirmOffset)
@@ -284,7 +307,7 @@ func TestConfirmCursorUpAtZero(t *testing.T) {
 	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}})
 	m.height = 13
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	updated, _ := m.Update(press("up"))
 	got := updated.(Model)
 	if got.confirmOffset != 0 {
 		t.Fatalf("expected confirmOffset 0, got %d", got.confirmOffset)
@@ -303,13 +326,13 @@ func TestConfirmCursorJAndK(t *testing.T) {
 	m := newTestModel(stateConfirm, artifacts, map[int]struct{}{0: {}, 1: {}, 2: {}, 3: {}, 4: {}, 5: {}})
 	m.height = 13
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	updated, _ := m.Update(press("j"))
 	got := updated.(Model)
 	if got.confirmOffset != 1 {
 		t.Fatalf("expected confirmOffset 1 after j, got %d", got.confirmOffset)
 	}
 
-	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	updated, _ = got.Update(press("k"))
 	got = updated.(Model)
 	if got.confirmOffset != 0 {
 		t.Fatalf("expected confirmOffset 0 after k, got %d", got.confirmOffset)
@@ -318,7 +341,7 @@ func TestConfirmCursorJAndK(t *testing.T) {
 
 func TestConfirmCtrlCQuits(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{0: {}})
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	_, cmd := m.Update(press("ctrl+c"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -328,7 +351,7 @@ func TestConfirmCtrlCQuits(t *testing.T) {
 
 func TestDeletingIgnoresNonQuitKeys(t *testing.T) {
 	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	updated, cmd := m.Update(press("x"))
 	got := updated.(Model)
 	if got.state != stateDeleting {
 		t.Fatalf("expected stateDeleting, got %v", got.state)
@@ -338,7 +361,7 @@ func TestDeletingIgnoresNonQuitKeys(t *testing.T) {
 
 func TestDeletingEscDoesNotQuit(t *testing.T) {
 	m := newTestModel(stateDeleting, sampleArtifacts, map[int]struct{}{0: {}})
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	_, cmd := m.Update(press("esc"))
 	if cmd != nil {
 		if _, ok := cmd().(tea.QuitMsg); ok {
 			t.Fatal("deleting state should not quit on esc")
@@ -350,7 +373,7 @@ func TestDeletingEscDoesNotQuit(t *testing.T) {
 
 func TestDoneEnterQuits(t *testing.T) {
 	m := newTestModel(stateDone, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(press("enter"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -358,7 +381,7 @@ func TestDoneEnterQuits(t *testing.T) {
 
 func TestDoneQQuits(t *testing.T) {
 	m := newTestModel(stateDone, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	_, cmd := m.Update(press("q"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -368,7 +391,7 @@ func TestDoneQQuits(t *testing.T) {
 
 func TestErrorEnterQuits(t *testing.T) {
 	m := newTestModel(stateError, nil, nil)
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(press("enter"))
 	if cmd == nil {
 		t.Fatal("expected quit command")
 	}
@@ -572,7 +595,7 @@ func TestSelectedArtifactsEmpty(t *testing.T) {
 func TestConfirmYWithEmptySelectedReturnsToList(t *testing.T) {
 	m := newTestModel(stateConfirm, sampleArtifacts, map[int]struct{}{})
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	updated, _ := m.Update(press("y"))
 	got := updated.(Model)
 	if got.state != stateList {
 		t.Fatalf("expected stateList when no actual artifacts selected, got %v", got.state)

@@ -180,12 +180,16 @@ func TestRenderListViewLayoutAndHelpText(t *testing.T) {
 	}
 }
 
+func renderView(m Model) string {
+	return stripANSI(m.View().Content)
+}
+
 // --- View() dispatch ---
 
 func TestViewLoading(t *testing.T) {
 	m := NewModel(scanner.ScanOptions{RootPath: "/test"})
 	m.state = stateLoading
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Scanning") {
 		t.Fatalf("expected scanning text, got:\n%s", output)
 	}
@@ -196,7 +200,7 @@ func TestViewLoadingKeepsAnimatedTitleReadable(t *testing.T) {
 	m.state = stateLoading
 	m.titleAnimationFrame = 4
 
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "repomop") {
 		t.Fatalf("expected animated title text to remain readable, got:\n%s", output)
 	}
@@ -204,7 +208,7 @@ func TestViewLoadingKeepsAnimatedTitleReadable(t *testing.T) {
 
 func TestViewError(t *testing.T) {
 	m := Model{state: stateError, message: "something broke"}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "something broke") {
 		t.Fatalf("expected error message, got:\n%s", output)
 	}
@@ -216,7 +220,7 @@ func TestViewError(t *testing.T) {
 func TestViewDeleting(t *testing.T) {
 	m := NewModel(scanner.ScanOptions{RootPath: "/test"})
 	m.state = stateDeleting
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Removing") {
 		t.Fatalf("expected removing text, got:\n%s", output)
 	}
@@ -227,7 +231,7 @@ func TestViewDoneNoArtifacts(t *testing.T) {
 		state:   stateDone,
 		message: "No artifacts found.",
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "No artifacts found.") {
 		t.Fatalf("expected no artifacts message, got:\n%s", output)
 	}
@@ -242,7 +246,7 @@ func TestViewDoneWithDeleted(t *testing.T) {
 			Errors:     []deleter.Error{},
 		},
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Deleted artifacts: 1") {
 		t.Fatalf("expected deleted count, got:\n%s", output)
 	}
@@ -261,7 +265,7 @@ func TestViewDoneWithErrors(t *testing.T) {
 			},
 		},
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Errors:") {
 		t.Fatalf("expected errors section, got:\n%s", output)
 	}
@@ -279,7 +283,7 @@ func TestViewDoneWithWarnings(t *testing.T) {
 			Errors:  []deleter.Error{},
 		},
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Size warnings: 1") {
 		t.Fatalf("expected warning count, got:\n%s", output)
 	}
@@ -294,7 +298,7 @@ func TestViewDoneWithMessage(t *testing.T) {
 			Errors:  []deleter.Error{},
 		},
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Some artifacts could not be removed.") {
 		t.Fatalf("expected message, got:\n%s", output)
 	}
@@ -306,7 +310,7 @@ func TestViewDoneWithFatalError(t *testing.T) {
 		fatalErr: fmt.Errorf("fatal"),
 		message:  "fatal",
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "error") {
 		t.Fatalf("expected error view, got:\n%s", output)
 	}
@@ -326,7 +330,7 @@ func TestViewConfirm(t *testing.T) {
 		selectedCount: 2,
 		selectedSize:  3072,
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if !strings.Contains(output, "Delete selected artifacts?") {
 		t.Fatalf("expected confirm title, got:\n%s", output)
 	}
@@ -380,7 +384,7 @@ func TestViewConfirmShowsAllItemsWhenHeightAllows(t *testing.T) {
 		width:         120,
 		height:        24,
 	}
-	output := stripANSI(m.View())
+	output := renderView(m)
 	if strings.Contains(output, "and 2 more") {
 		t.Fatalf("confirm view must not collapse to top 5 items:\n%s", output)
 	}
@@ -551,8 +555,8 @@ func TestPathColumnWidthNarrow(t *testing.T) {
 func TestViewDefaultReturnsEmpty(t *testing.T) {
 	m := Model{state: viewState(99)}
 	output := m.View()
-	if output != "" {
-		t.Fatalf("expected empty for unknown state, got %q", output)
+	if output.Content != "" {
+		t.Fatalf("expected empty for unknown state, got %q", output.Content)
 	}
 }
 

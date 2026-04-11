@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"repomop/internal/delete"
 	"repomop/internal/format"
@@ -84,7 +84,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	}
 
-	program := tea.NewProgram(tui.NewModel(scanOpts), tea.WithAltScreen())
+	program := tea.NewProgram(tui.NewModel(scanOpts))
 	finalModel, err := program.Run()
 	if err != nil {
 		fmt.Fprintf(stderr, "tui failed: %v\n", err)
