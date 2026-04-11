@@ -50,3 +50,9 @@ redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
 large_stack_arrays = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+opt-level = "z"
