@@ -1,6 +1,6 @@
 [workspace]
-members = ["repomop-core", "repomop-fs", "repomop-scanner", "repomop-tui", "repomop-cli"]
-default-members = ["repomop-cli"]
+members = ["repomop-core", "repomop-fs", "repomop-scanner", "repomop-tui", "repomop"]
+default-members = ["repomop"]
 resolver = "2"
 
 [workspace.package]
