@@ -27,7 +27,7 @@ struct JobResult {
 
 pub fn recommended_worker_count() -> usize {
     std::thread::available_parallelism()
-        .map(|count| count.get())
+        .map(std::num::NonZero::get)
         .unwrap_or(1)
         .clamp(1, 8)
 }
@@ -227,7 +227,7 @@ fn private_data_size(path: &Path) -> io::Result<u64> {
     let result = unsafe {
         libc::getattrlist(
             c_path.as_ptr(),
-            (&mut attr_list as *mut libc::attrlist).cast(),
+            (&raw mut attr_list).cast(),
             buffer.as_mut_ptr().cast(),
             buffer.len(),
             libc::FSOPT_ATTR_CMN_EXTENDED,

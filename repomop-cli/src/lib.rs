@@ -8,6 +8,7 @@ use repomop_core::{
 use repomop_fs::{DeleteResult, delete_artifacts};
 use repomop_scanner::scan_and_measure;
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CliOptions {
     path: PathBuf,
@@ -73,7 +74,7 @@ pub fn run(
         let result = delete_artifacts(&artifacts);
         print_delete_summary(stdout, &root_path, &artifacts, &warnings, &result)
             .ok();
-        return usize::from(!result.errors.is_empty()) as i32;
+        return i32::from(!result.errors.is_empty());
     }
 
     match repomop_tui::run(scan_opts) {
@@ -157,7 +158,9 @@ fn parse_max_depth(value: &str) -> Result<Option<usize>, String> {
         value.parse().map_err(|_| "max-depth must be -1 or >= 0".to_string())?;
     match parsed {
         -1 => Ok(None),
-        0.. => Ok(Some(parsed as usize)),
+        0.. => usize::try_from(parsed)
+            .map(Some)
+            .map_err(|_| "max-depth must be -1 or >= 0".to_string()),
         _ => Err("max-depth must be -1 or >= 0".to_string()),
     }
 }
@@ -214,7 +217,7 @@ fn print_dry_run(
         writeln!(
             stdout,
             "- {:>8}  {}  {}",
-            format_bytes(artifact.size_bytes as i64),
+            format_bytes(artifact.size_bytes),
             relative_path_or_self(root, &artifact.path).display(),
             artifact.kind
         )?;
@@ -223,7 +226,7 @@ fn print_dry_run(
         stdout,
         "Found: {} artifacts, Potential free space: {}",
         artifacts.len(),
-        format_bytes(total as i64)
+        format_bytes(total)
     )?;
     if !warnings.is_empty() {
         writeln!(stdout, "Warnings: {} size calculation warnings", warnings.len())?;
@@ -246,7 +249,7 @@ fn print_delete_summary(
 
     writeln!(stdout, "Found artifacts: {}", artifacts.len())?;
     writeln!(stdout, "Deleted: {}", result.deleted.len())?;
-    writeln!(stdout, "Freed space: {}", format_bytes(result.freed_bytes as i64))?;
+    writeln!(stdout, "Freed space: {}", format_bytes(result.freed_bytes))?;
     if !result.errors.is_empty() {
         writeln!(stdout, "Delete errors: {}", result.errors.len())?;
         for item in &result.errors {

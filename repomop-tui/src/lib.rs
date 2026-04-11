@@ -141,7 +141,7 @@ impl App {
                         "Some artifacts could not be removed.".to_string()
                     };
                 }
-                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
             }
         }
     }
@@ -302,7 +302,7 @@ impl App {
                 format!(
                     "Selected {} · Reclaimable {}",
                     self.selected_count(),
-                    format_bytes(self.selected_size() as i64)
+                    format_bytes(self.selected_size())
                 ),
                 Color::Blue,
                 true,
@@ -358,7 +358,7 @@ impl App {
             Line::from(vec![
                 Span::raw("Estimated space to free: "),
                 Span::styled(
-                    format_bytes(total_size as i64),
+                    format_bytes(total_size),
                     Style::default().fg(Color::Cyan),
                 ),
             ]),
@@ -380,7 +380,7 @@ impl App {
                 relative_path_or_self(&self.opts.root_path, &artifact.path)
                     .display()
                     .to_string();
-            let size = format!("({})", format_bytes(artifact.size_bytes as i64));
+            let size = format!("({})", format_bytes(artifact.size_bytes));
             let width = area.width as usize;
             let path_width = width.saturating_sub(size.len() + 3).max(1);
             lines.push(Line::from(vec![
@@ -446,7 +446,7 @@ impl App {
                 styled_line(
                     format!(
                         "Freed space: {}",
-                        format_bytes(self.delete_result.freed_bytes as i64)
+                        format_bytes(self.delete_result.freed_bytes)
                     ),
                     Color::Cyan,
                     true,
@@ -517,7 +517,7 @@ impl App {
         let bar = if focused { "▶ " } else { "  " };
         let size = format!(
             "{:>width$}",
-            format_bytes(artifact.size_bytes as i64),
+            format_bytes(artifact.size_bytes),
             width = size_width
         );
         let kind = artifact.kind.to_string();
@@ -696,7 +696,7 @@ fn max_confirm_offset(total: usize, height: usize) -> usize {
 fn compute_size_column_width(artifacts: &[Artifact]) -> usize {
     artifacts
         .iter()
-        .map(|artifact| format_bytes(artifact.size_bytes as i64).len())
+        .map(|artifact| format_bytes(artifact.size_bytes).len())
         .max()
         .unwrap_or_else(|| format_bytes(0).len())
 }

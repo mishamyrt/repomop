@@ -3,8 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use repomop_core::{
-    ARTIFACT_DEFINITIONS, Artifact, ArtifactDefinition, ArtifactKind, ArtifactMatcher, ScanOptions,
-    normalize_path, sort_artifacts_by_size_desc,
+    ARTIFACT_DEFINITIONS, Artifact, ArtifactDefinition, ArtifactKind,
+    ArtifactMatcher, ScanOptions, normalize_path, sort_artifacts_by_size_desc,
 };
 use repomop_fs::{SizeOptions, directories, recommended_worker_count};
 
@@ -44,16 +44,14 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
     }
 
     let root = normalize_path(&opts.root_path);
-    let root_metadata = fs::metadata(&root).map_err(|err| format!("stat root path: {err}"))?;
+    let root_metadata =
+        fs::metadata(&root).map_err(|err| format!("stat root path: {err}"))?;
     if !root_metadata.is_dir() {
         return Err(format!("root path is not a directory: {}", root.display()));
     }
 
     let mut scan_ctx = ScanContext::new(root.clone());
-    let mut stack = vec![WalkItem {
-        path: root.clone(),
-        depth: 0,
-    }];
+    let mut stack = vec![WalkItem { path: root, depth: 0 }];
     let mut artifacts = Vec::new();
     let mut warnings = Vec::new();
     let mut visited_dirs = HashSet::new();
@@ -63,7 +61,10 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
             let real_path = match fs::canonicalize(&item.path) {
                 Ok(path) => normalize_path(&path),
                 Err(err) => {
-                    warnings.push(format!("resolve directory {}: {err}", item.path.display()));
+                    warnings.push(format!(
+                        "resolve directory {}: {err}",
+                        item.path.display()
+                    ));
                     continue;
                 }
             };
@@ -75,7 +76,8 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
         let entries = match fs::read_dir(&item.path) {
             Ok(entries) => entries,
             Err(err) => {
-                warnings.push(format!("read directory {}: {err}", item.path.display()));
+                warnings
+                    .push(format!("read directory {}: {err}", item.path.display()));
                 continue;
             }
         };
@@ -87,29 +89,35 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(err) => {
-                    warnings.push(format!("read directory {}: {err}", item.path.display()));
+                    warnings.push(format!(
+                        "read directory {}: {err}",
+                        item.path.display()
+                    ));
                     continue;
                 }
             };
 
             let child_path = entry.path();
-            let (is_dir, is_symlink_dir) =
-                match directory_entry_status(&child_path, opts.include_links, &entry.file_type()) {
-                    Ok(status) => status,
-                    Err(err) => {
-                        warnings.push(format!("resolve directory {}: {err}", child_path.display()));
-                        continue;
-                    }
-                };
+            let (is_dir, is_symlink_dir) = match directory_entry_status(
+                &child_path,
+                opts.include_links,
+                &entry.file_type(),
+            ) {
+                Ok(status) => status,
+                Err(err) => {
+                    warnings.push(format!(
+                        "resolve directory {}: {err}",
+                        child_path.display()
+                    ));
+                    continue;
+                }
+            };
             if !is_dir {
                 continue;
             }
 
             let child_depth = item.depth + 1;
-            if opts
-                .max_depth
-                .is_some_and(|max_depth| child_depth > max_depth)
-            {
+            if opts.max_depth.is_some_and(|max_depth| child_depth > max_depth) {
                 continue;
             }
 
@@ -118,10 +126,7 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
                 continue;
             }
 
-            let child = WalkItem {
-                path: child_path,
-                depth: child_depth,
-            };
+            let child = WalkItem { path: child_path, depth: child_depth };
             if is_symlink_dir {
                 symlink_children.push(child);
             } else {
@@ -136,18 +141,16 @@ pub fn scan(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> 
     Ok((artifacts, warnings))
 }
 
-pub fn scan_and_measure(opts: &ScanOptions) -> Result<(Vec<Artifact>, Vec<String>), String> {
+pub fn scan_and_measure(
+    opts: &ScanOptions,
+) -> Result<(Vec<Artifact>, Vec<String>), String> {
     let (mut artifacts, mut warnings) = scan(opts)?;
-    let paths: Vec<PathBuf> = artifacts
-        .iter()
-        .map(|artifact| artifact.path.clone())
-        .collect();
+    let paths: Vec<PathBuf> =
+        artifacts.iter().map(|artifact| artifact.path.clone()).collect();
     let (sizes, size_warnings) = directories(
         &paths,
         recommended_worker_count(),
-        SizeOptions {
-            include_links: opts.include_links,
-        },
+        SizeOptions { include_links: opts.include_links },
     );
 
     for artifact in &mut artifacts {
@@ -224,14 +227,20 @@ fn detect_candidate(
     })
 }
 
-fn definition_matches(ctx: &mut ScanContext, definition: &ArtifactDefinition, path: &Path) -> bool {
+fn definition_matches(
+    ctx: &mut ScanContext,
+    definition: &ArtifactDefinition,
+    path: &Path,
+) -> bool {
     let Some(base) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
 
     match definition.matcher {
         ArtifactMatcher::NamedDir(name) => base == name,
-        ArtifactMatcher::PrefixDir(prefix) => base.starts_with(prefix) && base.len() > prefix.len(),
+        ArtifactMatcher::PrefixDir(prefix) => {
+            base.starts_with(prefix) && base.len() > prefix.len()
+        }
         ArtifactMatcher::PathSuffix(parts) => has_path_suffix(path, parts),
         ArtifactMatcher::VirtualEnv => is_virtual_env(ctx, path),
     }
@@ -255,8 +264,12 @@ fn infer_venv_project_root(
     path: &Path,
     project_markers: &[&str],
 ) -> PathBuf {
-    find_nearest_ancestor_with_marker(ctx, path.parent().unwrap_or(path), project_markers)
-        .unwrap_or_else(|| path.parent().unwrap_or(path).to_path_buf())
+    find_nearest_ancestor_with_marker(
+        ctx,
+        path.parent().unwrap_or(path),
+        project_markers,
+    )
+    .unwrap_or_else(|| path.parent().unwrap_or(path).to_path_buf())
 }
 
 fn find_nearest_ancestor_with_marker(
@@ -271,19 +284,14 @@ fn find_nearest_ancestor_with_marker(
             return None;
         }
 
-        if markers
-            .iter()
-            .any(|marker| cached_has_marker(ctx, &current, marker))
-        {
+        if markers.iter().any(|marker| cached_has_marker(ctx, &current, marker)) {
             return Some(current);
         }
 
         if current == ctx.root {
             return None;
         }
-        let Some(parent) = current.parent() else {
-            return None;
-        };
+        let parent = current.parent()?;
         current = parent.to_path_buf();
     }
 }
@@ -320,9 +328,8 @@ fn cached_is_file(ctx: &mut ScanContext, path: &Path) -> bool {
         return *value;
     }
 
-    let result = fs::metadata(path)
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false);
+    let result =
+        fs::metadata(path).map(|metadata| metadata.is_file()).unwrap_or(false);
     ctx.file_exists_cache.insert(path.to_path_buf(), result);
     result
 }
@@ -336,7 +343,8 @@ fn wildcard_match(name: &str, pattern: &str) -> bool {
 
     while text_idx < name.len() {
         if pattern_idx < pattern.len()
-            && (pattern[pattern_idx] == b'?' || pattern[pattern_idx] == name[text_idx])
+            && (pattern[pattern_idx] == b'?'
+                || pattern[pattern_idx] == name[text_idx])
         {
             text_idx += 1;
             pattern_idx += 1;
@@ -451,11 +459,8 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let flutter_project = temp.path().join("apps/flutter-app");
         fs::create_dir_all(flutter_project.join("build")).unwrap();
-        fs::write(
-            temp.path().join("settings.gradle"),
-            "rootProject.name='mono'",
-        )
-        .unwrap();
+        fs::write(temp.path().join("settings.gradle"), "rootProject.name='mono'")
+            .unwrap();
         fs::write(flutter_project.join("pubspec.yaml"), "name: app").unwrap();
 
         let (artifacts, _) = scan(&make_opts(temp.path())).unwrap();
