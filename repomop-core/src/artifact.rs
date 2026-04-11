@@ -180,7 +180,7 @@ pub struct ScanOptions {
 }
 
 pub fn sort_artifacts_by_size_desc(artifacts: &mut [Artifact]) {
-    artifacts.sort_by(|a, b| {
+    artifacts.sort_unstable_by(|a, b| {
         b.size_bytes.cmp(&a.size_bytes).then_with(|| a.path.cmp(&b.path))
     });
 }

@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 repomop-core = { path = "../repomop-core" }
 repomop-fs = { path = "../repomop-fs" }
+thiserror.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -1,47 +1,105 @@
 use std::fs;
+use std::io;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::thread;
 
 use repomop_core::Artifact;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct DeleteError {
     pub artifact: Artifact,
-    pub error: String,
+    pub error: io::Error,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct DeleteResult {
     pub deleted: Vec<Artifact>,
     pub errors: Vec<DeleteError>,
     pub freed_bytes: u64,
 }
 
-pub fn delete_artifacts(artifacts: &[Artifact]) -> DeleteResult {
-    let mut result = DeleteResult {
-        deleted: Vec::with_capacity(artifacts.len()),
-        errors: Vec::new(),
-        freed_bytes: 0,
-    };
+#[derive(Debug)]
+enum DeletionOutcome {
+    Deleted { artifact: Artifact },
+    Missing { artifact: Artifact },
+    Failed { artifact: Artifact, error: io::Error },
+}
 
-    for artifact in artifacts {
-        match fs::remove_dir_all(&artifact.path) {
-            Ok(()) => {
-                result.freed_bytes =
-                    result.freed_bytes.saturating_add(artifact.size_bytes);
-                result.deleted.push(artifact.clone());
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                result.freed_bytes =
-                    result.freed_bytes.saturating_add(artifact.size_bytes);
-                result.deleted.push(artifact.clone());
-            }
-            Err(err) => result.errors.push(DeleteError {
-                artifact: artifact.clone(),
-                error: err.to_string(),
-            }),
-        }
+pub fn delete_artifacts(artifacts: &[Artifact]) -> DeleteResult {
+    if artifacts.is_empty() {
+        return DeleteResult::default();
     }
 
-    result
+    let worker_count = worker_count_for(artifacts.len());
+    let next_index = AtomicUsize::new(0);
+    let (sender, receiver) = mpsc::channel::<DeletionOutcome>();
+
+    thread::scope(|scope| {
+        for _ in 0..worker_count {
+            let sender = sender.clone();
+            let next_index = &next_index;
+            scope.spawn(move || {
+                loop {
+                    let idx = next_index.fetch_add(1, Ordering::Relaxed);
+                    let Some(artifact) = artifacts.get(idx) else {
+                        break;
+                    };
+                    let outcome = match fs::remove_dir_all(&artifact.path) {
+                        Ok(()) => DeletionOutcome::Deleted { artifact: artifact.clone() },
+                        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                            DeletionOutcome::Missing { artifact: artifact.clone() }
+                        }
+                        Err(error) => {
+                            DeletionOutcome::Failed { artifact: artifact.clone(), error }
+                        }
+                    };
+                    if sender.send(outcome).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        drop(sender);
+
+        let mut result = DeleteResult {
+            deleted: Vec::with_capacity(artifacts.len()),
+            errors: Vec::new(),
+            freed_bytes: 0,
+        };
+
+        for outcome in receiver {
+            match outcome {
+                DeletionOutcome::Deleted { artifact }
+                | DeletionOutcome::Missing { artifact } => {
+                    result.freed_bytes =
+                        result.freed_bytes.saturating_add(artifact.size_bytes);
+                    result.deleted.push(artifact);
+                }
+                DeletionOutcome::Failed { artifact, error } => {
+                    result.errors.push(DeleteError { artifact, error });
+                }
+            }
+        }
+
+        result
+    })
+}
+
+fn worker_count_for(n: usize) -> usize {
+    thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(1)
+        .clamp(1, 8)
+        .min(n)
+}
+
+/// Returns the filesystem path that failed to delete.
+impl DeleteError {
+    pub fn path(&self) -> &PathBuf {
+        &self.artifact.path
+    }
 }
 
 #[cfg(test)]

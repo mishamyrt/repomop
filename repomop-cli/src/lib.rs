@@ -52,7 +52,7 @@ pub fn run(
     };
 
     let scan_opts = ScanOptions {
-        root_path: root_path.clone(),
+        root_path,
         max_depth: opts.max_depth,
         include_links: opts.include_links,
     };
@@ -67,13 +67,19 @@ pub fn run(
         };
 
         if opts.dry_run {
-            print_dry_run(stdout, &root_path, &artifacts, &warnings).ok();
+            print_dry_run(stdout, &scan_opts.root_path, &artifacts, &warnings).ok();
             return 0;
         }
 
         let result = delete_artifacts(&artifacts);
-        print_delete_summary(stdout, &root_path, &artifacts, &warnings, &result)
-            .ok();
+        print_delete_summary(
+            stdout,
+            &scan_opts.root_path,
+            &artifacts,
+            &warnings,
+            &result,
+        )
+        .ok();
         return i32::from(!result.errors.is_empty());
     }
 

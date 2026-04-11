@@ -303,7 +303,7 @@ mod tests {
         fs::hard_link(&store_path, dir.join("shared.bin")).unwrap();
 
         let (sizes, warnings) =
-            directories(&[dir.clone()], 1, SizeOptions::default());
+            directories(std::slice::from_ref(&dir), 1, SizeOptions::default());
         assert!(warnings.is_empty());
         assert_eq!(sizes[&dir], 100);
     }
@@ -322,8 +322,11 @@ mod tests {
         fs::write(&store_path, [0u8; 200]).unwrap();
         fs::hard_link(&store_path, dir.join("shared.bin")).unwrap();
 
-        let (sizes, warnings) =
-            directories(&[dir.clone()], 1, SizeOptions { include_links: true });
+        let (sizes, warnings) = directories(
+            std::slice::from_ref(&dir),
+            1,
+            SizeOptions { include_links: true },
+        );
         assert!(warnings.is_empty());
         assert_eq!(sizes[&dir], 300);
     }
@@ -340,7 +343,8 @@ mod tests {
         std::os::unix::fs::symlink(&external, dir.join("link")).unwrap();
         fs::write(dir.join("real.bin"), [0u8; 50]).unwrap();
 
-        let (sizes, _) = directories(&[dir.clone()], 1, SizeOptions::default());
+        let (sizes, _) =
+            directories(std::slice::from_ref(&dir), 1, SizeOptions::default());
         assert_eq!(sizes[&dir], 50);
     }
 
@@ -354,8 +358,11 @@ mod tests {
         fs::write(target.join("dep.bin"), [0u8; 90]).unwrap();
         std::os::unix::fs::symlink(&target, &link).unwrap();
 
-        let (sizes, warnings) =
-            directories(&[link.clone()], 1, SizeOptions { include_links: true });
+        let (sizes, warnings) = directories(
+            std::slice::from_ref(&link),
+            1,
+            SizeOptions { include_links: true },
+        );
         assert!(warnings.is_empty());
         assert_eq!(sizes[&link], 90);
     }
@@ -363,7 +370,8 @@ mod tests {
     #[test]
     fn nonexistent_paths_return_zero_size() {
         let missing = PathBuf::from("/nonexistent/path/xyz");
-        let (sizes, _) = directories(&[missing.clone()], 1, SizeOptions::default());
+        let (sizes, _) =
+            directories(std::slice::from_ref(&missing), 1, SizeOptions::default());
         assert_eq!(sizes[&missing], 0);
     }
 }

@@ -23,10 +23,13 @@ pub fn format_bytes(value: u64) -> String {
     )
 }
 
+#[allow(clippy::cast_sign_loss)]
 pub fn format_signed_bytes(value: i64) -> String {
-    match u64::try_from(value) {
-        Ok(value) => format_bytes(value),
-        Err(_) => "0 B".to_string(),
+    if value < 0 {
+        format!("-{}", format_bytes(value.unsigned_abs()))
+    } else {
+        #[allow(clippy::cast_sign_loss)]
+        format_bytes(value as u64)
     }
 }
 
@@ -35,8 +38,9 @@ mod tests {
     use super::{format_bytes, format_signed_bytes};
 
     #[test]
-    fn formats_negative_as_zero() {
-        assert_eq!(format_signed_bytes(-1), "0 B");
+    fn formats_negative_as_negative() {
+        assert_eq!(format_signed_bytes(-1), "-1 B");
+        assert_eq!(format_signed_bytes(-1024), "-1.0 KiB");
     }
 
     #[test]

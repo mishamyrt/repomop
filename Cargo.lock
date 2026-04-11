@@ -1055,6 +1055,7 @@ dependencies = [
  "repomop-core",
  "repomop-fs",
  "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

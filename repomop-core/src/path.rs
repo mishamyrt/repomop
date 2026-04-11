@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
 pub fn normalize_path(path: &Path) -> PathBuf {
@@ -18,14 +19,16 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     if normalized.as_os_str().is_empty() { PathBuf::from(".") } else { normalized }
 }
 
-pub fn relative_path_or_self(root: &Path, path: &Path) -> PathBuf {
+/// Returns the path relative to `root`, or the original path unchanged if it is
+/// not a descendant of `root`. Never allocates when the path is returned as-is.
+pub fn relative_path_or_self<'a>(root: &Path, path: &'a Path) -> Cow<'a, Path> {
     if root.as_os_str().is_empty() || path.as_os_str().is_empty() {
-        return path.to_path_buf();
+        return Cow::Borrowed(path);
     }
 
     match path.strip_prefix(root) {
-        Ok(relative) if !relative.as_os_str().is_empty() => relative.to_path_buf(),
-        _ => path.to_path_buf(),
+        Ok(relative) if !relative.as_os_str().is_empty() => Cow::Borrowed(relative),
+        _ => Cow::Borrowed(path),
     }
 }
 
@@ -44,13 +47,16 @@ mod tests {
     #[test]
     fn relative_returns_original_for_same_path() {
         let root = Path::new("/root");
-        assert_eq!(relative_path_or_self(root, root), PathBuf::from("/root"));
+        assert_eq!(relative_path_or_self(root, root).as_ref(), Path::new("/root"));
     }
 
     #[test]
     fn relative_returns_child() {
         let root = Path::new("/repo");
         let path = Path::new("/repo/src/main.rs");
-        assert_eq!(relative_path_or_self(root, path), PathBuf::from("src/main.rs"));
+        assert_eq!(
+            relative_path_or_self(root, path).as_ref(),
+            Path::new("src/main.rs")
+        );
     }
 }
