@@ -1,0 +1,15 @@
+[package]
+name = "repomop-tui"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+repomop-core = { path = "../repomop-core" }
+repomop-fs = { path = "../repomop-fs" }
+repomop-scanner = { path = "../repomop-scanner" }
+
+[lints]
+workspace = true

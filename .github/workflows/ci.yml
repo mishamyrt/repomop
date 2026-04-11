@@ -19,16 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          go-version-file: go.mod
-
-      - name: Add Go bin to PATH
-        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
-      - name: Install revive
-        run: go install github.com/mgechev/revive@latest
+          components: llvm-tools-preview
 
       - name: Run lint
         run: make lint
@@ -40,10 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          go-version-file: go.mod
+          components: llvm-tools-preview
 
       - name: Run tests
         run: make test
@@ -68,21 +62,18 @@ jobs:
             goarch: arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          go-version-file: go.mod
+          components: llvm-tools-preview
 
       - name: Build binary
-        env:
-          CGO_ENABLED: "0"
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p "dist/repomop_${GOOS}_${GOARCH}"
-          go build -trimpath -ldflags "-s -w" -o "dist/repomop_${GOOS}_${GOARCH}/repomop" ./cmd/repomop
+          cargo build --release
+          cp target/release/repomop "dist/repomop_${GOOS}_${GOARCH}/repomop"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

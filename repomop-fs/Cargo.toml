@@ -1,0 +1,15 @@
+[package]
+name = "repomop-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libc.workspace = true
+repomop-core = { path = "../repomop-core" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -6,34 +6,24 @@ all: build
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 \
-		go build \
-			-ldflags "-s -w -X 'main.appVersion=v${VERSION}'" \
-			-o repomop \
-			./cmd/repomop
+	cargo build --profile release
 
 .PHONY: test
 test:
-	go test ./...
-
-.PHONY: coverage
-coverage:
-	go test -coverprofile=coverage.out $(TEST_MODULES)
-	go tool cover -html=coverage.out -o coverage.html
+	cargo test
 
 .PHONY: lint
 lint:
-	revive -config revive.toml -formatter stylish ./...
+	cargo clippy
 
 .PHONY: install
 install: build
 	rm -f "$(HOME)/.local/bin/repomop"
-	cp repomop "$(HOME)/.local/bin/repomop"
-	chmod +x "$(HOME)/.local/bin/repomop"
+	cp target/release/repomop "$(HOME)/.local/bin/repomop"
 
 .PHONY: clean
 clean:
-	rm -f repomop
+	rm -rf target
 
 .PHONY: publish
 publish:

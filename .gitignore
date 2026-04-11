@@ -1,4 +1,3 @@
-/repomop
-/coverage.*
 .cursor
 testdata/
+/target
