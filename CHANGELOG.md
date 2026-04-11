@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/mishamyrt/repomop/compare/v0.6.1..v0.7.0) - 2026-04-11
+
+### 🚀 Features
+
+- Improve loaders
+
+### 🚜 Refactor
+
+- Migrate to rust
+- Fix code-style problems
+- Improve code
+- Remove cli suffix
+- Split scanner
+
+### 📚 Documentation
+
+- Describe homebrew installation
+
 ## [0.6.1](https://github.com/mishamyrt/repomop/compare/v0.6.0..v0.6.1) - 2026-03-27
 
 ### 🚜 Refactor

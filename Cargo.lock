@@ -1300,7 +1300,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "repomop"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "repomop-core",
  "repomop-fs",
@@ -1311,11 +1311,11 @@ dependencies = [
 
 [[package]]
 name = "repomop-core"
-version = "0.6.1"
+version = "0.7.0"
 
 [[package]]
 name = "repomop-fs"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "codspeed-criterion-compat",
  "libc",
@@ -1325,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "repomop-scanner"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "codspeed-criterion-compat",
  "repomop-core",
@@ -1336,7 +1336,7 @@ dependencies = [
 
 [[package]]
 name = "repomop-tui"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "crossterm",
  "ratatui",
