@@ -1,3 +1,4 @@
 .cursor
 testdata/
 /target
+**/target/
