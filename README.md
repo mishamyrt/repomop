@@ -113,4 +113,4 @@ repomop --path ~/Projects
 
 On the confirmation screen, `Enter` is intentionally ignored to avoid accidental cancellation.
 
-> **Warning:** Deletion is permanent. Selected directories are removed with `os.RemoveAll`.
+> **Warning:** Deletion is permanent.
