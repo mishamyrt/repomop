@@ -106,3 +106,71 @@ jobs:
           files: |
             dist/repomop_*.tar.gz
             dist/checksums.txt
+
+      - name: Checkout tap
+        uses: actions/checkout@v6
+        with:
+          repository: mishamyrt/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          ARM_URL="${BASE}/repomop_darwin_arm64.tar.gz"
+          AMD_URL="${BASE}/repomop_darwin_amd64.tar.gz"
+          ARM_SHA256=$(sha256sum dist/repomop_darwin_arm64.tar.gz | awk '{print $1}')
+          AMD_SHA256=$(sha256sum dist/repomop_darwin_amd64.tar.gz | awk '{print $1}')
+          VERSION="${TAG#v}"
+
+          cat > tap/Formula/repomop.rb << 'FORMULA'
+          class Repomop < Formula
+            desc "Project artifacts cleaner"
+            homepage "https://github.com/mishamyrt/repomop"
+            version "VERSION_PLACEHOLDER"
+            license "MIT"
+
+            depends_on :macos
+
+            if Hardware::CPU.arm?
+              url "ARM_URL_PLACEHOLDER"
+              sha256 "ARM_SHA256_PLACEHOLDER"
+            else
+              url "AMD_URL_PLACEHOLDER"
+              sha256 "AMD_SHA256_PLACEHOLDER"
+            end
+
+            def install
+              bin.install "repomop"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/repomop --version")
+            end
+          end
+          FORMULA
+
+          sed -i 's/^          //' tap/Formula/repomop.rb
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|" tap/Formula/repomop.rb
+          sed -i "s|ARM_URL_PLACEHOLDER|${ARM_URL}|" tap/Formula/repomop.rb
+          sed -i "s|ARM_SHA256_PLACEHOLDER|${ARM_SHA256}|" tap/Formula/repomop.rb
+          sed -i "s|AMD_URL_PLACEHOLDER|${AMD_URL}|" tap/Formula/repomop.rb
+          sed -i "s|AMD_SHA256_PLACEHOLDER|${AMD_SHA256}|" tap/Formula/repomop.rb
+
+      - name: Commit and push tap update
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git -C tap config user.name "github-actions[bot]"
+          git -C tap config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C tap add Formula/repomop.rb
+
+          if git -C tap diff --cached --quiet; then
+            echo "Formula is already up to date for ${TAG}"
+            exit 0
+          fi
+
+          git -C tap commit -m "chore: update repomop to ${TAG}"
+          git -C tap push
