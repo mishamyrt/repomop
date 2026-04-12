@@ -8,9 +8,9 @@ license = { workspace = true }
 crossterm = { workspace = true }
 libc = { workspace = true }
 ratatui = { workspace = true }
-repomop-core = { path = "../repomop-core" }
-repomop-fs = { path = "../repomop-fs" }
-repomop-scanner = { path = "../repomop-scanner" }
+repomop-core = { workspace = true }
+repomop-fs = { workspace = true }
+repomop-scanner = { workspace = true }
 
 [lints]
 workspace = true

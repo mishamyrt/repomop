@@ -1,17 +1,17 @@
 [package]
 name = "repomop"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-repomop-core = { path = "../repomop-core" }
-repomop-fs = { path = "../repomop-fs" }
-repomop-scanner = { path = "../repomop-scanner" }
-repomop-tui = { path = "../repomop-tui" }
+repomop-core = { workspace = true }
+repomop-fs = { workspace = true }
+repomop-scanner = { workspace = true }
+repomop-tui = { workspace = true }
 
 [dev-dependencies]
-tempfile.workspace = true
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,16 +1,16 @@
 [package]
 name = "repomop-fs"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-libc.workspace = true
-repomop-core = { path = "../repomop-core" }
+libc = { workspace = true }
+repomop-core = { workspace = true }
 
 [dev-dependencies]
-criterion.workspace = true
-tempfile.workspace = true
+criterion = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "size"

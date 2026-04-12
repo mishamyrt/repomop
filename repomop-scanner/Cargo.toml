@@ -1,17 +1,17 @@
 [package]
 name = "repomop-scanner"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-repomop-core = { path = "../repomop-core" }
-repomop-fs = { path = "../repomop-fs" }
-thiserror.workspace = true
+repomop-core = { workspace = true }
+repomop-fs = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion.workspace = true
-tempfile.workspace = true
+criterion = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "scan"
