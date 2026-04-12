@@ -78,16 +78,31 @@ fn detect_from_osc_11() -> Option<TerminalTheme> {
 
     while Instant::now() < deadline && response.len() < MAX_RESPONSE_BYTES {
         let remaining = deadline.saturating_duration_since(Instant::now());
+        let remaining_sec = remaining.as_secs().cast_signed() as libc::time_t;
+        let remaining_usec = {
+            #[cfg(target_os = "macos")]
+            {
+                let Ok(usec) =
+                    libc::suseconds_t::try_from(remaining.subsec_micros())
+                else {
+                    return None;
+                };
+                usec
+            }
+            #[cfg(target_os = "linux")]
+            {
+                libc::suseconds_t::from(remaining.subsec_micros())
+            }
+        };
+
+        let mut timeout =
+            libc::timeval { tv_sec: remaining_sec, tv_usec: remaining_usec };
+
         let mut read_set = unsafe { std::mem::zeroed::<libc::fd_set>() };
         unsafe {
             libc::FD_ZERO(&raw mut read_set);
             libc::FD_SET(fd, &raw mut read_set);
         }
-        let mut timeout = libc::timeval {
-            tv_sec: remaining.as_secs() as libc::time_t,
-            tv_usec: remaining.subsec_micros() as libc::suseconds_t,
-        };
-
         let ready = unsafe {
             libc::select(
                 fd + 1,
