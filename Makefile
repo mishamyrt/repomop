@@ -1,4 +1,4 @@
-VERSION := 0.7.0
+VERSION := 0.7.1
 
 .PHONY: all
 all: build
@@ -26,7 +26,10 @@ clean:
 
 .PHONY: publish
 publish:
-	@git add Makefile
+	@sed -E 's/^version = "[^"]+"/version = "${VERSION}"/' Cargo.toml > Cargo.toml.tmp
+	@mv Cargo.toml.tmp Cargo.toml
+	@cargo update -p repomop
+	@git add Makefile Cargo.toml Cargo.lock
 	@git commit -m "chore: release ${VERSION} 🔥"
 	@git tag "v${VERSION}"
 	@git-cliff -o CHANGELOG.md

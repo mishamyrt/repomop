@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1](https://github.com/mishamyrt/repomop/compare/v0.7.0..v0.7.1) - 2026-04-12
+
+### 🐛 Bug Fixes
+
+- Correctly color primary text
+
 ## [0.7.0](https://github.com/mishamyrt/repomop/compare/v0.6.1..v0.7.0) - 2026-04-11
 
 ### 🚀 Features
