@@ -30,7 +30,7 @@ impl App {
 
     fn render_loading(&self, frame: &mut Frame, area: Rect) {
         let text = Text::from(vec![
-            styled_line("repomop", Color::White, true),
+            styled_line("repomop", self.theme.primary_text(), true),
             Line::raw(""),
             Line::raw(format!(
                 "{} Scanning directories and calculating sizes...",
@@ -98,7 +98,11 @@ impl App {
             selected.iter().map(|artifact| artifact.size_bytes).sum();
 
         let mut lines = vec![
-            styled_line("Delete selected artifacts?", Color::White, true),
+            styled_line(
+                "Delete selected artifacts?",
+                self.theme.primary_text(),
+                true,
+            ),
             Line::raw(""),
             Line::raw(if selected.len() == 1 {
                 "1 artifact will be permanently deleted".to_string()
@@ -134,7 +138,7 @@ impl App {
                 Span::raw("- "),
                 Span::styled(
                     truncate_path_left(&relative, path_width),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(self.theme.primary_text()),
                 ),
                 Span::raw(" "),
                 Span::styled(size, Style::default().fg(Color::Cyan)),
@@ -154,7 +158,7 @@ impl App {
 
     fn render_deleting(&self, frame: &mut Frame, area: Rect) {
         let text = Text::from(vec![
-            styled_line("repomop", Color::White, true),
+            styled_line("repomop", self.theme.primary_text(), true),
             Line::raw(""),
             Line::raw(format!(
                 "{} Removing selected artifacts...",
@@ -172,13 +176,13 @@ impl App {
 
         let mut lines = if self.no_artifacts_found {
             vec![
-                styled_line("repomop", Color::White, true),
+                styled_line("repomop", self.theme.primary_text(), true),
                 Line::raw(""),
                 styled_line("No artifacts found.", Color::Green, false),
             ]
         } else {
             vec![
-                styled_line("repomop: done", Color::White, true),
+                styled_line("repomop: done", self.theme.primary_text(), true),
                 Line::raw(""),
                 styled_line(
                     format!(
@@ -237,7 +241,7 @@ impl App {
 
     fn render_error(&self, frame: &mut Frame, area: Rect) {
         let text = Text::from(vec![
-            styled_line("repomop: error", Color::White, true),
+            styled_line("repomop: error", self.theme.primary_text(), true),
             Line::raw(""),
             styled_line(self.message.clone(), Color::Red, false),
             Line::raw(""),
@@ -276,7 +280,7 @@ impl App {
             span_focus("  ".to_string(), focused),
             artifact_span(size, Color::Cyan, focused),
             span_focus("  ".to_string(), focused),
-            artifact_span(path, Color::White, focused),
+            artifact_span(path, self.theme.primary_text(), focused),
             span_focus("  ".to_string(), focused),
             artifact_span(kind, Color::DarkGray, focused),
         ])

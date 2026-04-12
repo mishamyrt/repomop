@@ -6,6 +6,7 @@ use repomop_core::{Artifact, ScanOptions, sort_artifacts_by_size_desc};
 use repomop_fs::{DeleteResult, delete_artifacts};
 use repomop_scanner::scan_and_measure;
 
+use crate::theme::TerminalTheme;
 use crate::widgets::{DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT};
 
 #[derive(Debug, Clone, Default)]
@@ -32,6 +33,7 @@ pub(crate) enum BackgroundEvent {
 #[derive(Debug)]
 pub(crate) struct App {
     pub(crate) opts: ScanOptions,
+    pub(crate) theme: TerminalTheme,
     pub(crate) state: ViewState,
     pub(crate) artifacts: Vec<Artifact>,
     pub(crate) selected: BTreeSet<usize>,
@@ -53,10 +55,11 @@ pub(crate) struct App {
 }
 
 impl App {
-    pub(crate) fn new(opts: ScanOptions) -> Self {
+    pub(crate) fn new(opts: ScanOptions, theme: TerminalTheme) -> Self {
         let (background_tx, background_rx) = mpsc::channel();
         let app = Self {
             opts,
+            theme,
             state: ViewState::Loading,
             artifacts: Vec::new(),
             selected: BTreeSet::new(),

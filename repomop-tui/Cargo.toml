@@ -6,6 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 crossterm = { workspace = true }
+libc = { workspace = true }
 ratatui = { workspace = true }
 repomop-core = { path = "../repomop-core" }
 repomop-fs = { path = "../repomop-fs" }
