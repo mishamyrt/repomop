@@ -1,6 +1,7 @@
 mod app;
 mod input;
 mod render;
+mod terminal;
 mod theme;
 mod widgets;
 
@@ -26,6 +27,7 @@ pub fn run(opts: ScanOptions) -> Result<SessionResult, String> {
     enable_raw_mode().map_err(|err| err.to_string())?;
     let theme = detect_terminal_theme();
     let mut stdout = io::stdout();
+    terminal::set_title("repomop");
     execute!(stdout, EnterAlternateScreen).map_err(|err| err.to_string())?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).map_err(|err| err.to_string())?;

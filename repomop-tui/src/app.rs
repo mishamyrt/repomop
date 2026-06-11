@@ -6,6 +6,7 @@ use repomop_core::{Artifact, ScanOptions, sort_artifacts_by_size_desc};
 use repomop_fs::{DeleteResult, delete_artifacts};
 use repomop_scanner::scan_and_measure;
 
+use crate::terminal;
 use crate::theme::TerminalTheme;
 use crate::widgets::{DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT};
 
@@ -103,6 +104,10 @@ impl App {
             match self.background_rx.try_recv() {
                 Ok(BackgroundEvent::ScanFinished(result)) => match result {
                     Ok((artifacts, warnings)) => {
+                        terminal::notify(
+                            "repomop",
+                            &scan_finished_message(artifacts.len(), warnings.len()),
+                        );
                         self.artifacts = artifacts;
                         self.scan_warnings = warnings;
                         self.selected.clear();
@@ -120,12 +125,14 @@ impl App {
                         }
                     }
                     Err(err) => {
+                        terminal::notify("repomop", "Scan failed");
                         self.state = ViewState::Error;
                         self.fatal_error = Some(err.clone());
                         self.message = err;
                     }
                 },
                 Ok(BackgroundEvent::DeleteFinished(result)) => {
+                    terminal::notify("repomop", &delete_finished_message(&result));
                     self.delete_result = result;
                     self.state = ViewState::Done;
                     self.message = if self.delete_result.errors.is_empty() {
@@ -181,5 +188,60 @@ impl App {
     /// Returns a reference to the confirm-screen artifact list without cloning.
     pub(crate) fn confirm_artifacts(&self) -> &[Artifact] {
         self.cached_selection.as_deref().unwrap_or(&[])
+    }
+}
+
+fn scan_finished_message(artifact_count: usize, warning_count: usize) -> String {
+    let artifact_label = if artifact_count == 1 { "artifact" } else { "artifacts" };
+    if warning_count == 0 {
+        format!("Scan complete: {artifact_count} {artifact_label} found")
+    } else {
+        format!(
+            "Scan complete: {artifact_count} {artifact_label} found, {warning_count} size warnings"
+        )
+    }
+}
+
+fn delete_finished_message(result: &DeleteResult) -> String {
+    let deleted_count = result.deleted.len();
+    let deleted_label = if deleted_count == 1 { "artifact" } else { "artifacts" };
+    if result.errors.is_empty() {
+        format!(
+            "Removed {deleted_count} {deleted_label}, freed {}",
+            repomop_core::format_bytes(result.freed_bytes)
+        )
+    } else {
+        format!(
+            "Removed {deleted_count} {deleted_label}, {} errors",
+            result.errors.len()
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{delete_finished_message, scan_finished_message};
+    use repomop_fs::DeleteResult;
+
+    #[test]
+    fn scan_finished_message_mentions_artifacts() {
+        assert_eq!(scan_finished_message(2, 0), "Scan complete: 2 artifacts found");
+    }
+
+    #[test]
+    fn scan_finished_message_mentions_warnings() {
+        assert_eq!(
+            scan_finished_message(1, 3),
+            "Scan complete: 1 artifact found, 3 size warnings"
+        );
+    }
+
+    #[test]
+    fn delete_finished_message_mentions_freed_space() {
+        let result = DeleteResult { freed_bytes: 1024, ..DeleteResult::default() };
+        assert_eq!(
+            delete_finished_message(&result),
+            "Removed 0 artifacts, freed 1.0 KiB"
+        );
     }
 }

@@ -268,7 +268,8 @@ impl App {
         let focused = self.cursor == index;
         let selected = self.selected.contains(&index);
         let marker = if selected { '●' } else { '○' };
-        let path_color = if selected { Color::Green } else { self.theme.primary_text() };
+        let path_color =
+            if selected { Color::Green } else { self.theme.primary_text() };
         let bar = if focused { "▶ " } else { "  " };
         let size = pad_left_to_width(format_bytes(artifact.size_bytes), size_width);
         let kind = artifact.kind.to_string();
