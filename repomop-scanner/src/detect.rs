@@ -35,19 +35,33 @@ pub(crate) fn detect_artifact(
     })
 }
 
+pub(crate) fn detect_virtual_env_artifact(
+    ctx: &mut ScanContext,
+    path: &Path,
+) -> Option<Artifact> {
+    let definition = ARTIFACT_DEFINITIONS.iter().find(|definition| {
+        matches!(definition.matcher, ArtifactMatcher::VirtualEnv)
+    })?;
+
+    Some(Artifact {
+        kind: definition.kind,
+        path: path.to_path_buf(),
+        project_root: infer_venv_project_root(ctx, path, definition.project_markers),
+        size_bytes: 0,
+    })
+}
+
 fn detect_candidate(
     ctx: &mut ScanContext,
     definition: &ArtifactDefinition,
     path: &Path,
 ) -> Option<Candidate> {
-    if !definition_matches(ctx, definition, path) {
+    if !definition_matches(definition, path) {
         return None;
     }
 
     let project_root = match definition.matcher {
-        ArtifactMatcher::VirtualEnv => {
-            infer_venv_project_root(ctx, path, definition.project_markers)
-        }
+        ArtifactMatcher::VirtualEnv => return None,
         _ => find_nearest_ancestor_with_marker(
             ctx,
             path.parent().unwrap_or(path),
@@ -62,11 +76,7 @@ fn detect_candidate(
     })
 }
 
-fn definition_matches(
-    ctx: &mut ScanContext,
-    definition: &ArtifactDefinition,
-    path: &Path,
-) -> bool {
+fn definition_matches(definition: &ArtifactDefinition, path: &Path) -> bool {
     let Some(base) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
@@ -77,7 +87,7 @@ fn definition_matches(
             base.starts_with(prefix) && base.len() > prefix.len()
         }
         ArtifactMatcher::PathSuffix(parts) => has_path_suffix(path, parts),
-        ArtifactMatcher::VirtualEnv => is_virtual_env(ctx, path),
+        ArtifactMatcher::VirtualEnv => false,
     }
 }
 
@@ -86,12 +96,6 @@ fn update_best(best: &mut Option<Candidate>, candidate: Candidate) {
         Some(current) if current.distance <= candidate.distance => {}
         _ => *best = Some(candidate),
     }
-}
-
-fn is_virtual_env(ctx: &mut ScanContext, path: &Path) -> bool {
-    ctx.is_file(&path.join("pyvenv.cfg"))
-        || (ctx.is_file(&path.join("bin/activate"))
-            && ctx.is_file(&path.join("bin/python")))
 }
 
 fn infer_venv_project_root(
@@ -141,8 +145,8 @@ mod tests {
 
     use super::{
         Candidate, definition_matches, detect_artifact, detect_candidate,
-        find_nearest_ancestor_with_marker, infer_venv_project_root, is_virtual_env,
-        update_best,
+        detect_virtual_env_artifact, find_nearest_ancestor_with_marker,
+        infer_venv_project_root, update_best,
     };
     use crate::context::ScanContext;
 
@@ -161,18 +165,12 @@ mod tests {
         let named = root.join("node_modules");
         let prefixed = root.join("cmake-build-debug");
         let suffixed = root.join("vendor/bundle");
-        let venv = root.join(".venv");
 
         fs::create_dir_all(&named).unwrap();
         fs::create_dir_all(&prefixed).unwrap();
         fs::create_dir_all(&suffixed).unwrap();
-        fs::create_dir_all(venv.join("bin")).unwrap();
-        fs::write(venv.join("pyvenv.cfg"), "home = /usr/bin").unwrap();
-
-        let mut ctx = ScanContext::new(root.to_path_buf());
 
         assert!(definition_matches(
-            &mut ctx,
             &definition(
                 ArtifactKind::NodeModules,
                 ArtifactMatcher::NamedDir("node_modules"),
@@ -181,7 +179,6 @@ mod tests {
             &named,
         ));
         assert!(definition_matches(
-            &mut ctx,
             &definition(
                 ArtifactKind::Cmake,
                 ArtifactMatcher::PrefixDir("cmake-build-"),
@@ -190,22 +187,12 @@ mod tests {
             &prefixed,
         ));
         assert!(definition_matches(
-            &mut ctx,
             &definition(
                 ArtifactKind::Ruby,
                 ArtifactMatcher::PathSuffix(&["vendor", "bundle"]),
                 &["Gemfile"],
             ),
             &suffixed,
-        ));
-        assert!(definition_matches(
-            &mut ctx,
-            &definition(
-                ArtifactKind::PythonVenv,
-                ArtifactMatcher::VirtualEnv,
-                &["pyproject.toml"],
-            ),
-            &venv,
         ));
     }
 
@@ -269,7 +256,22 @@ mod tests {
     }
 
     #[test]
-    fn is_virtual_env_accepts_bin_layout_without_pyvenv_cfg() {
+    fn detect_virtual_env_artifact_uses_python_project_root() {
+        let temp = TempDir::new().unwrap();
+        let project = temp.path().join("project");
+        let venv = project.join(".venv");
+        fs::create_dir_all(&venv).unwrap();
+        fs::write(project.join("pyproject.toml"), "[project]").unwrap();
+
+        let mut ctx = ScanContext::new(temp.path().to_path_buf());
+        let artifact = detect_virtual_env_artifact(&mut ctx, &venv).unwrap();
+
+        assert_eq!(artifact.kind, ArtifactKind::PythonVenv);
+        assert_eq!(artifact.project_root, project);
+    }
+
+    #[test]
+    fn detect_artifact_does_not_probe_virtualenv_internals() {
         let temp = TempDir::new().unwrap();
         let venv = temp.path().join(".venv");
         fs::create_dir_all(venv.join("bin")).unwrap();
@@ -277,7 +279,7 @@ mod tests {
         fs::write(venv.join("bin/python"), "").unwrap();
 
         let mut ctx = ScanContext::new(temp.path().to_path_buf());
-        assert!(is_virtual_env(&mut ctx, &venv));
+        assert!(detect_artifact(&mut ctx, &venv).is_none());
     }
 
     #[test]

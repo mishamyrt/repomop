@@ -8,7 +8,7 @@ use repomop_core::{
 use repomop_fs::{SizeOptions, directories, recommended_worker_count};
 
 use crate::context::ScanContext;
-use crate::detect::detect_artifact;
+use crate::detect::{detect_artifact, detect_virtual_env_artifact};
 
 #[derive(Debug, Clone)]
 struct WalkItem {
@@ -64,6 +64,8 @@ pub(crate) fn scan(
 
         let mut symlink_children = Vec::new();
         let mut regular_children = Vec::new();
+        let mut has_pyvenv_cfg = false;
+        let mut bin_path = None;
 
         for entry in entries {
             let entry = match entry {
@@ -78,10 +80,23 @@ pub(crate) fn scan(
             };
 
             let child_path = entry.path();
+            let child_name = entry.file_name();
+            let child_name = child_name.to_str();
+            let file_type = entry.file_type();
+
+            if child_name == Some("pyvenv.cfg")
+                && file_type.as_ref().is_ok_and(fs::FileType::is_file)
+            {
+                has_pyvenv_cfg = true;
+            }
+            if child_name == Some("bin") {
+                bin_path = Some(child_path.clone());
+            }
+
             let (is_dir, is_symlink_dir) = match directory_entry_status(
                 &child_path,
                 opts.include_links,
-                &entry.file_type(),
+                &file_type,
             ) {
                 Ok(status) => status,
                 Err(err) => {
@@ -111,6 +126,18 @@ pub(crate) fn scan(
                 symlink_children.push(child);
             } else {
                 regular_children.push(child);
+            }
+        }
+
+        if item.depth > 0
+            && (has_pyvenv_cfg
+                || bin_path.as_deref().is_some_and(has_bin_python_markers))
+        {
+            if let Some(artifact) =
+                detect_virtual_env_artifact(&mut scan_ctx, &item.path)
+            {
+                artifacts.push(artifact);
+                continue;
             }
         }
 
@@ -161,6 +188,38 @@ fn directory_entry_status(
 
     let metadata = fs::metadata(path)?;
     Ok((metadata.is_dir(), true))
+}
+
+fn has_bin_python_markers(bin_path: &Path) -> bool {
+    let Ok(entries) = fs::read_dir(bin_path) else {
+        return false;
+    };
+    let mut has_activate = false;
+    let mut has_python = false;
+
+    for entry in entries.filter_map(Result::ok) {
+        let file_name = entry.file_name();
+        let Some(file_name) = file_name.to_str() else {
+            continue;
+        };
+        if file_name != "activate" && file_name != "python" {
+            continue;
+        }
+        if !entry.file_type().is_ok_and(|file_type| file_type.is_file()) {
+            continue;
+        }
+
+        if file_name == "activate" {
+            has_activate = true;
+        } else {
+            has_python = true;
+        }
+        if has_activate && has_python {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -273,6 +332,23 @@ mod tests {
         fs::create_dir_all(&venv).unwrap();
         fs::write(project.join("pyproject.toml"), "[project]\nname='x'").unwrap();
         fs::write(venv.join("pyvenv.cfg"), "home = /usr/bin").unwrap();
+
+        let (artifacts, _) = scan(&make_opts(temp.path())).unwrap();
+        assert_eq!(artifacts.len(), 1);
+        assert_eq!(artifacts[0].kind, ArtifactKind::PythonVenv);
+        assert_eq!(artifacts[0].path, venv);
+        assert_eq!(artifacts[0].project_root, project);
+    }
+
+    #[test]
+    fn detects_virtualenvs_with_bin_layout() {
+        let temp = TempDir::new().unwrap();
+        let project = temp.path().join("python");
+        let venv = project.join("env");
+        fs::create_dir_all(venv.join("bin")).unwrap();
+        fs::write(project.join("requirements.txt"), "pytest\n").unwrap();
+        fs::write(venv.join("bin/activate"), "").unwrap();
+        fs::write(venv.join("bin/python"), "").unwrap();
 
         let (artifacts, _) = scan(&make_opts(temp.path())).unwrap();
         assert_eq!(artifacts.len(), 1);
