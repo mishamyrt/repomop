@@ -1344,6 +1344,7 @@ dependencies = [
  "repomop-core",
  "repomop-fs",
  "repomop-scanner",
+ "unicode-width",
 ]
 
 [[package]]

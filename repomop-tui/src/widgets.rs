@@ -4,6 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Text;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use repomop_core::{Artifact, format_bytes};
 
@@ -134,13 +135,40 @@ pub(crate) fn max_confirm_offset(total: usize, height: usize) -> usize {
 
 // ── Column-width helpers ──────────────────────────────────────────────────────
 
+const WIDE_PATH_COLUMN_MAX: usize = 72;
+
 pub(crate) fn compute_size_column_width(artifacts: &[Artifact]) -> usize {
     artifacts
         .iter()
-        .map(|a| a.size_bytes)
+        .map(|artifact| display_width(&format_bytes(artifact.size_bytes)))
         .max()
-        .map(|max| format_bytes(max).len())
         .unwrap_or_else(|| format_bytes(0).len())
+}
+
+pub(crate) fn compute_kind_column_width(artifacts: &[Artifact]) -> usize {
+    artifacts.iter().map(|artifact| artifact.kind.as_str().len()).max().unwrap_or(0)
+}
+
+pub(crate) fn compute_list_path_column_width(
+    root: &Path,
+    artifacts: &[Artifact],
+    total_width: usize,
+    size_width: usize,
+    kind_width: usize,
+) -> usize {
+    let available_width = path_column_width(total_width, size_width, kind_width);
+    if total_width <= 100 {
+        return available_width;
+    }
+
+    artifacts
+        .iter()
+        .map(|artifact| display_width(&display_relative(root, &artifact.path)))
+        .max()
+        .unwrap_or(1)
+        .min(WIDE_PATH_COLUMN_MAX)
+        .min(available_width)
+        .max(1)
 }
 
 pub(crate) fn path_column_width(
@@ -148,7 +176,33 @@ pub(crate) fn path_column_width(
     size_width: usize,
     kind_width: usize,
 ) -> usize {
-    total_width.saturating_sub(2 + 1 + 6 + size_width + kind_width).max(1)
+    let fixed_width = display_width("▶ ")
+        + display_width("●")
+        + display_width("  ")
+        + display_width("  ")
+        + display_width("  ");
+    total_width.saturating_sub(fixed_width + size_width + kind_width).max(1)
+}
+
+pub(crate) fn display_width(text: &str) -> usize {
+    UnicodeWidthStr::width(text)
+}
+
+pub(crate) fn pad_right_to_width(mut text: String, target_width: usize) -> String {
+    let width = display_width(&text);
+    if width < target_width {
+        text.push_str(&" ".repeat(target_width - width));
+    }
+    text
+}
+
+pub(crate) fn pad_left_to_width(text: String, target_width: usize) -> String {
+    let width = display_width(&text);
+    if width < target_width {
+        format!("{}{}", " ".repeat(target_width - width), text)
+    } else {
+        text
+    }
 }
 
 // ── Path truncation ───────────────────────────────────────────────────────────
@@ -158,10 +212,10 @@ pub(crate) fn truncate_path_left(path: &str, max_width: usize) -> String {
     if max_width == 0 {
         return String::new();
     }
-    if path.chars().count() <= max_width {
+    if display_width(path) <= max_width {
         return path.to_string();
     }
-    if max_width == 1 {
+    if max_width <= display_width(ELLIPSIS) {
         return ELLIPSIS.to_string();
     }
 
@@ -170,20 +224,27 @@ pub(crate) fn truncate_path_left(path: &str, max_width: usize) -> String {
     } else {
         ELLIPSIS.to_string()
     };
-    if prefix.chars().count() >= max_width {
+    let prefix_width = display_width(&prefix);
+    if prefix_width >= max_width {
         return ELLIPSIS.to_string();
     }
 
-    let remaining = max_width - prefix.chars().count();
-    let tail: String = path
-        .chars()
-        .rev()
-        .take(remaining)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
+    let tail = tail_for_width(path, max_width - prefix_width);
     format!("{prefix}{tail}")
+}
+
+fn tail_for_width(text: &str, max_width: usize) -> String {
+    let mut width = 0;
+    let mut tail = Vec::new();
+    for ch in text.chars().rev() {
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + char_width > max_width {
+            break;
+        }
+        width += char_width;
+        tail.push(ch);
+    }
+    tail.into_iter().rev().collect()
 }
 
 // ── Path display ──────────────────────────────────────────────────────────────
@@ -196,9 +257,13 @@ pub(crate) fn display_relative(root: &Path, path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT, delete_spinner,
-        scan_spinner, truncate_path_left, visible_range_for,
+        DELETE_SPINNER_FRAME_COUNT, SCAN_SPINNER_FRAME_COUNT,
+        compute_list_path_column_width, compute_size_column_width, delete_spinner,
+        display_width, pad_left_to_width, pad_right_to_width, scan_spinner,
+        truncate_path_left, visible_range_for,
     };
+    use repomop_core::{Artifact, ArtifactKind};
+    use std::path::PathBuf;
 
     #[test]
     fn truncate_keeps_short_paths() {
@@ -220,6 +285,99 @@ mod tests {
     }
 
     #[test]
+    fn list_path_column_uses_remaining_width_on_narrow_screens() {
+        let artifacts = vec![artifact("/repo/short")];
+
+        assert_eq!(
+            compute_list_path_column_width(
+                PathBuf::from("/repo").as_path(),
+                &artifacts,
+                80,
+                8,
+                12
+            ),
+            51
+        );
+    }
+
+    #[test]
+    fn list_path_column_uses_content_width_on_wide_screens() {
+        let artifacts = vec![artifact("/repo/short")];
+
+        assert_eq!(
+            compute_list_path_column_width(
+                PathBuf::from("/repo").as_path(),
+                &artifacts,
+                120,
+                8,
+                12
+            ),
+            5
+        );
+    }
+
+    #[test]
+    fn list_path_column_caps_long_paths_on_wide_screens() {
+        let artifacts = vec![artifact(
+            "/repo/a/very/long/path/that/should/not/push/the/type/to/the/right/edge/node_modules",
+        )];
+
+        assert_eq!(
+            compute_list_path_column_width(
+                PathBuf::from("/repo").as_path(),
+                &artifacts,
+                140,
+                8,
+                12
+            ),
+            72
+        );
+    }
+
+    #[test]
+    fn truncate_respects_terminal_display_width() {
+        let value = truncate_path_left("a/界界界/node_modules", 10);
+
+        assert!(display_width(&value) <= 10);
+        assert!(value.starts_with("…/"));
+    }
+
+    #[test]
+    fn pad_right_respects_terminal_display_width() {
+        let value = pad_right_to_width("界".to_string(), 4);
+
+        assert_eq!(display_width(&value), 4);
+        assert_eq!(value, "界  ");
+    }
+
+    #[test]
+    fn size_column_uses_widest_formatted_size() {
+        let artifacts = vec![
+            artifact_with_size("/repo/target", 1024 * 1024 * 1024),
+            artifact_with_size("/repo/node_modules", 999 * 1024 * 1024),
+        ];
+
+        assert_eq!(compute_size_column_width(&artifacts), "999.0 MiB".len());
+    }
+
+    #[test]
+    fn list_row_path_start_does_not_depend_on_size_width() {
+        let size_width = "1023.0 GiB".len();
+        let short_size_row =
+            plain_list_row("  ", "○", "1 B", "short", "node-modules", size_width);
+        let long_size_row = plain_list_row(
+            "  ",
+            "○",
+            "1023.0 GiB",
+            "short",
+            "node-modules",
+            size_width,
+        );
+
+        assert_eq!(short_size_row.find("short"), long_size_row.find("short"));
+    }
+
+    #[test]
     fn scan_spinner_wraps_to_first_frame() {
         assert_eq!(scan_spinner(0), scan_spinner(SCAN_SPINNER_FRAME_COUNT));
     }
@@ -227,5 +385,30 @@ mod tests {
     #[test]
     fn delete_spinner_wraps_to_first_frame() {
         assert_eq!(delete_spinner(0), delete_spinner(DELETE_SPINNER_FRAME_COUNT));
+    }
+
+    fn artifact(path: &str) -> Artifact {
+        artifact_with_size(path, 0)
+    }
+
+    fn artifact_with_size(path: &str, size_bytes: u64) -> Artifact {
+        Artifact {
+            kind: ArtifactKind::NodeModules,
+            path: PathBuf::from(path),
+            project_root: PathBuf::from("/repo"),
+            size_bytes,
+        }
+    }
+
+    fn plain_list_row(
+        bar: &str,
+        marker: &str,
+        size: &str,
+        path: &str,
+        kind: &str,
+        size_width: usize,
+    ) -> String {
+        let size = pad_left_to_width(size.to_string(), size_width);
+        format!("{bar}{marker}  {size}  {path}  {kind}")
     }
 }

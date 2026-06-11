@@ -10,8 +10,9 @@ use repomop_core::format_bytes;
 use crate::app::{App, ViewState};
 use crate::widgets::{
     CONFIRM_CHROME_LINES, CONFIRM_MIN_VISIBLE, LIST_CHROME_LINES, LIST_MIN_VISIBLE,
-    artifact_span, compute_size_column_width, delete_spinner, display_relative,
-    focus_style, paragraph, path_column_width, scan_spinner, styled_line,
+    artifact_span, compute_kind_column_width, compute_list_path_column_width,
+    compute_size_column_width, delete_spinner, display_relative, focus_style,
+    pad_left_to_width, pad_right_to_width, paragraph, scan_spinner, styled_line,
     truncate_path_left, visible_range_for, visible_range_from_offset,
 };
 
@@ -68,12 +69,18 @@ impl App {
             LIST_MIN_VISIBLE,
         );
         let size_width = compute_size_column_width(&self.artifacts);
+        let kind_width = compute_kind_column_width(&self.artifacts);
+        let path_width = compute_list_path_column_width(
+            &self.opts.root_path,
+            &self.artifacts,
+            area.width as usize,
+            size_width,
+            kind_width,
+        );
         for index in start..end {
-            lines.push(self.render_artifact_line(
-                index,
-                area.width as usize,
-                size_width,
-            ));
+            lines.push(
+                self.render_artifact_line(index, size_width, path_width, kind_width),
+            );
         }
 
         if !self.message.is_empty() {
@@ -253,22 +260,22 @@ impl App {
     fn render_artifact_line(
         &self,
         index: usize,
-        width: usize,
         size_width: usize,
+        path_width: usize,
+        kind_width: usize,
     ) -> Line<'static> {
         let artifact = &self.artifacts[index];
         let focused = self.cursor == index;
         let marker = if self.selected.contains(&index) { '●' } else { '○' };
         let bar = if focused { "▶ " } else { "  " };
-        let size = format!(
-            "{:>width$}",
-            format_bytes(artifact.size_bytes),
-            width = size_width
-        );
+        let size = pad_left_to_width(format_bytes(artifact.size_bytes), size_width);
         let kind = artifact.kind.to_string();
         let relative = display_relative(&self.opts.root_path, &artifact.path);
-        let path_width = path_column_width(width, size_width, kind.len());
-        let path = truncate_path_left(&relative, path_width);
+        let path = pad_right_to_width(
+            truncate_path_left(&relative, path_width),
+            path_width,
+        );
+        let kind = format!("{kind:>kind_width$}");
 
         Line::from(vec![
             span_focus(bar.to_string(), focused),
